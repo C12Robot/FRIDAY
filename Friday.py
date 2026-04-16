@@ -18,6 +18,10 @@ from dotenv import load_dotenv
 from memory import FridayMemory
 from voice import speak, get_input, stop_speaking, start_wake_word_listener, stop_wake_word_listener
 from tools import web_search, read_file, write_file, gmail_read, gmail_send, gmail_search, calendar_get, calendar_create
+from behaviour import (log_interaction, get_behaviour_context,
+                       write_obsidian_log, detect_and_log_decision,
+                       is_weekly_summary_due, generate_weekly_summary,
+                       write_weekly_summary)
 
 load_dotenv()
 
@@ -138,7 +142,7 @@ TOOL_DEFINITIONS = [
     },
     {
         "name": "calendar_create",
-        "description": "Create a new event in the user's Google Calendar. Extract the event title, date and time from the user's message. Convert relative dates like 'tomorrow' to actual dates based on today being April 15 2026. Times should be in ISO format: YYYY-MM-DDTHH:MM:SS. Always confirm with user before creating.",
+        "description": "Create a new event in the user's Google Calendar. Extract the event title, date and time from the user's message. Convert relative dates like 'tomorrow' to actual dates based on today being April 16 2026. Times should be in ISO format: YYYY-MM-DDTHH:MM:SS. Always confirm with user before creating.",
         "input_schema": {
             "type": "object",
             "properties": {
@@ -176,10 +180,6 @@ When you don't know something, use your tools to find out.
 Present information directly without preamble like 'Based on my search' or 'I found that'.
 Keep responses concise — you are speaking out loud, so avoid long lists or bullet points."""
 
-SUMMARISE_PROMPT = """Present the information directly and concisely.
-No preamble. No 'Based on search results'. Just answer cleanly.
-Keep it to 3-4 sentences maximum — this will be spoken out loud."""
-
 conversation_history = []
 
 
@@ -193,11 +193,7 @@ def execute_tool(tool_name, tool_input):
     elif tool_name == "gmail_read":
         return gmail_read()
     elif tool_name == "gmail_send":
-        return gmail_send(
-            tool_input["to"],
-            tool_input["subject"],
-            tool_input["body"]
-        )
+        return gmail_send(tool_input["to"], tool_input["subject"], tool_input["body"])
     elif tool_name == "gmail_search":
         return gmail_search(tool_input["query"])
     elif tool_name == "calendar_get":
@@ -219,6 +215,7 @@ def chat(user_message):
     full_system_prompt = BASE_SYSTEM_PROMPT
     if memory_context:
         full_system_prompt += f"\n{memory_context}"
+    full_system_prompt += get_behaviour_context()
 
     conversation_history.append({
         "role": "user",
@@ -243,16 +240,11 @@ def chat(user_message):
             tool_results = []
             for block in response.content:
                 if block.type == "tool_use":
-                    tool_name = block.name
-                    tool_input = block.input
-
-                    print(f"\n  🔧 FRIDAY is using {tool_name}...", flush=True)
-
+                    print(f"\n  🔧 FRIDAY is using {block.name}...", flush=True)
                     try:
-                        tool_result = execute_tool(tool_name, tool_input)
+                        tool_result = execute_tool(block.name, block.input)
                     except Exception as e:
                         tool_result = f"Tool error: {str(e)}"
-
                     tool_results.append({
                         "type": "tool_result",
                         "tool_use_id": block.id,
@@ -280,24 +272,10 @@ def chat(user_message):
             })
 
             memory.save_memory(f"User: {user_message} | FRIDAY: {friday_reply}")
+            tools_used = [b.name for b in response.content if hasattr(b, 'type') and b.type == 'tool_use']
+            log_interaction(user_message, friday_reply, tools_used)
+            detect_and_log_decision(user_message, friday_reply)
             return friday_reply
-
-    friday_reply = ""
-    for block in response.content:
-        if hasattr(block, 'text'):
-            friday_reply = block.text
-            break
-
-    if not friday_reply:
-        friday_reply = "I couldn't generate a response. Please try again."
-
-    conversation_history.append({
-        "role": "assistant",
-        "content": friday_reply
-    })
-
-    memory.save_memory(f"User: {user_message} | FRIDAY: {friday_reply}")
-    return friday_reply
 
 
 MODE = "text"
@@ -317,6 +295,19 @@ def activate_voice_mode():
 voice.on_wake_word = activate_voice_mode
 
 start_wake_word_listener()
+
+# ── WEEKLY SUMMARY CHECK ON STARTUP ──────────────────────────────────────────
+if is_weekly_summary_due():
+    print("\nFRIDAY: Hey, it's Sunday — time for your weekly summary. Generating...\n")
+    summary = generate_weekly_summary()
+    if summary:
+        print(f"FRIDAY: Here's what I'd write:\n\n{summary}\n")
+        confirm = input("Write this to Obsidian? (yes/no): ").strip().lower()
+        if confirm == "yes":
+            write_weekly_summary(summary)
+            print("FRIDAY: Weekly summary saved to Obsidian.\n")
+        else:
+            print("FRIDAY: Skipped. I'll ask again next Sunday.\n")
 
 print("=" * 40)
 print("  FRIDAY is online.")
@@ -376,6 +367,12 @@ while True:
             pass
         print("FRIDAY: Goodbye.")
         break
+
+    if user_lower.startswith("log "):
+        note = user_input
+        write_obsidian_log(note)
+        print("FRIDAY: Logged to Obsidian.\n")
+        continue
 
     response = chat(user_input)
     print(f"\nFRIDAY: {response}\n")
