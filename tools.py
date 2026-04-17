@@ -1,7 +1,10 @@
 from calendar_tool import get_upcoming_events, create_event
 from gmail import read_emails, send_email, search_emails
+from spotify import spotify_play, spotify_pause, spotify_next, spotify_current, spotify_play_playlist
+from automation import open_app, open_url, search_youtube, focus_mode_on, focus_mode_off
 import requests
 import os
+from automation import open_app, open_url, search_youtube, focus_mode_on, focus_mode_off, search_browser_history
 
 
 def web_search(query):
@@ -58,11 +61,13 @@ def write_file(path, content):
         return "Write cancelled by user."
 
     try:
-        with open(path, "w", encoding="utf-8") as f:
-            f.write(content)
+        mode = "a" if "FRIDAY'S LOGS" in path or ".md" in path else "w"
+        with open(path, mode, encoding="utf-8") as f:
+            f.write("\n" + content)
         return f"File written successfully to {path}"
     except Exception as e:
         return f"Error writing file: {str(e)}"
+
 
 def gmail_read(input=None):
     return read_emails(max_results=5)
@@ -74,6 +79,7 @@ def gmail_send(to, subject, body):
 
 def gmail_search(query):
     return search_emails(query)
+
 
 def calendar_get(input=None):
     try:
@@ -87,3 +93,46 @@ def calendar_get(input=None):
 
 def calendar_create(summary, start_time, end_time, description="", location=""):
     return create_event(summary, start_time, end_time, description, location)
+
+
+def spotify_play_song(query):
+    return spotify_play(query)
+
+
+def spotify_play_list(name):
+    return spotify_play_playlist(name)
+
+
+def spotify_control(action):
+    if action == "pause":
+        return spotify_pause()
+    elif action == "next":
+        return spotify_next()
+    elif action == "current":
+        return spotify_current()
+    return "Unknown action."
+
+
+def open_application(app_name):
+    return open_app(app_name)
+
+
+def open_website(url):
+    return open_url(url)
+
+
+def youtube_search(query):
+    return search_youtube(query)
+
+
+def focus_on():
+    return focus_mode_on()
+
+
+def focus_off():
+    return focus_mode_off()
+
+
+def browser_history(query):
+    result = search_browser_history(query)
+    return result

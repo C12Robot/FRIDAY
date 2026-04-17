@@ -10,7 +10,7 @@ load_dotenv()
 
 BEHAVIOUR_LOG      = os.path.join(os.path.dirname(__file__), "behaviour_log.json")
 OBSIDIAN_BASE      = r"C:\Users\meena\Documents\Builder_Brain\FRIDAY'S LOGS"
-OBSIDIAN_LOG       = os.path.join(OBSIDIAN_BASE, "Daily Log.md")
+OBSIDIAN_LOG       = os.path.join(OBSIDIAN_BASE, "FRIDAY LOGS.md")
 OBSIDIAN_DECISIONS = os.path.join(OBSIDIAN_BASE, "Decisions.md")
 OBSIDIAN_WEEKLY    = os.path.join(OBSIDIAN_BASE, "Weekly Summaries.md")
 

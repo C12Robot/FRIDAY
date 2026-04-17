@@ -17,39 +17,29 @@ from anthropic import Anthropic
 from dotenv import load_dotenv
 from memory import FridayMemory
 from voice import speak, get_input, stop_speaking, start_wake_word_listener, stop_wake_word_listener
-from tools import web_search, read_file, write_file, gmail_read, gmail_send, gmail_search, calendar_get, calendar_create
+from tools import (web_search, read_file, write_file, gmail_read, gmail_send, gmail_search,
+                   calendar_get, calendar_create, spotify_play_song, spotify_play_list,
+                   spotify_control, open_application, open_website, youtube_search,
+                   focus_on, focus_off, browser_history)
 from behaviour import (log_interaction, get_behaviour_context,
                        write_obsidian_log, detect_and_log_decision,
                        is_weekly_summary_due, generate_weekly_summary,
                        write_weekly_summary)
+from router import is_complex, ask_ollama, is_ollama_running
 
 load_dotenv()
 
 client = Anthropic()
 memory = FridayMemory()
 
-TOOLS = {
-    "web_search": web_search,
-    "read_file": read_file,
-    "write_file": write_file,
-    "gmail_read": gmail_read,
-    "gmail_send": gmail_send,
-    "gmail_search": gmail_search,
-    "calendar_get": calendar_get,
-    "calendar_create": calendar_create
-}
-
 TOOL_DEFINITIONS = [
     {
         "name": "web_search",
-        "description": "Search the internet for current information, news, or anything FRIDAY doesn't know. Use this for recent events, latest news, current prices, or any real-time information.",
+        "description": "Search the internet for current information, news, or anything FRIDAY doesn't know.",
         "input_schema": {
             "type": "object",
             "properties": {
-                "query": {
-                    "type": "string",
-                    "description": "The search query to look up"
-                }
+                "query": {"type": "string", "description": "The search query to look up"}
             },
             "required": ["query"]
         }
@@ -60,10 +50,7 @@ TOOL_DEFINITIONS = [
         "input_schema": {
             "type": "object",
             "properties": {
-                "path": {
-                    "type": "string",
-                    "description": "The full file path to read"
-                }
+                "path": {"type": "string", "description": "The full file path to read"}
             },
             "required": ["path"]
         }
@@ -74,26 +61,16 @@ TOOL_DEFINITIONS = [
         "input_schema": {
             "type": "object",
             "properties": {
-                "path": {
-                    "type": "string",
-                    "description": "The full file path to write to"
-                },
-                "content": {
-                    "type": "string",
-                    "description": "The content to write to the file"
-                }
+                "path": {"type": "string", "description": "The full file path to write to"},
+                "content": {"type": "string", "description": "The content to write to the file"}
             },
             "required": ["path", "content"]
         }
     },
     {
         "name": "gmail_read",
-        "description": "Read the user's unread emails from Gmail. Use this when the user asks to check, read or see their emails.",
-        "input_schema": {
-            "type": "object",
-            "properties": {},
-            "required": []
-        }
+        "description": "Read the user's unread emails from Gmail.",
+        "input_schema": {"type": "object", "properties": {}, "required": []}
     },
     {
         "name": "gmail_send",
@@ -101,79 +78,136 @@ TOOL_DEFINITIONS = [
         "input_schema": {
             "type": "object",
             "properties": {
-                "to": {
-                    "type": "string",
-                    "description": "Recipient email address"
-                },
-                "subject": {
-                    "type": "string",
-                    "description": "Email subject line"
-                },
-                "body": {
-                    "type": "string",
-                    "description": "Email body content"
-                }
+                "to": {"type": "string", "description": "Recipient email address"},
+                "subject": {"type": "string", "description": "Email subject line"},
+                "body": {"type": "string", "description": "Email body content"}
             },
             "required": ["to", "subject", "body"]
         }
     },
     {
         "name": "gmail_search",
-        "description": "Search through the user's Gmail with a query. Use Gmail search syntax.",
+        "description": "Search through the user's Gmail with a query.",
         "input_schema": {
             "type": "object",
             "properties": {
-                "query": {
-                    "type": "string",
-                    "description": "Gmail search query e.g. 'from:boss@company.com' or 'subject:meeting'"
-                }
+                "query": {"type": "string", "description": "Gmail search query"}
             },
             "required": ["query"]
         }
     },
     {
         "name": "calendar_get",
-        "description": "Get the user's upcoming Google Calendar events. Use when user asks about schedule, upcoming events, or what they have planned.",
-        "input_schema": {
-            "type": "object",
-            "properties": {},
-            "required": []
-        }
+        "description": "Get the user's upcoming Google Calendar events.",
+        "input_schema": {"type": "object", "properties": {}, "required": []}
     },
     {
         "name": "calendar_create",
-        "description": "Create a new event in the user's Google Calendar. Extract the event title, date and time from the user's message. Convert relative dates like 'tomorrow' to actual dates based on today being April 16 2026. Times should be in ISO format: YYYY-MM-DDTHH:MM:SS. Always confirm with user before creating.",
+        "description": "Create a new event in the user's Google Calendar.",
         "input_schema": {
             "type": "object",
             "properties": {
-                "summary": {
-                    "type": "string",
-                    "description": "Event title or name"
-                },
-                "start_time": {
-                    "type": "string",
-                    "description": "Start time in ISO format e.g. 2026-04-16T14:00:00"
-                },
-                "end_time": {
-                    "type": "string",
-                    "description": "End time in ISO format e.g. 2026-04-16T15:00:00"
-                },
-                "description": {
-                    "type": "string",
-                    "description": "Optional event description"
-                },
-                "location": {
-                    "type": "string",
-                    "description": "Optional event location"
-                }
+                "summary": {"type": "string", "description": "Event title or name"},
+                "start_time": {"type": "string", "description": "Start time in ISO format"},
+                "end_time": {"type": "string", "description": "End time in ISO format"},
+                "description": {"type": "string", "description": "Optional event description"},
+                "location": {"type": "string", "description": "Optional event location"}
             },
             "required": ["summary", "start_time", "end_time"]
         }
+    },
+    {
+        "name": "spotify_play_song",
+        "description": "Play a song on Spotify. Use when user asks to play a specific song or artist.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "query": {"type": "string", "description": "Song name or artist to search and play"}
+            },
+            "required": ["query"]
+        }
+    },
+    {
+        "name": "spotify_play_list",
+        "description": "Play a playlist on Spotify by name.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "name": {"type": "string", "description": "Playlist name to search and play"}
+            },
+            "required": ["name"]
+        }
+    },
+    {
+        "name": "spotify_control",
+        "description": "Control Spotify playback — pause, skip to next track, or check what's currently playing.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "action": {"type": "string", "description": "Action: pause, next, or current"}
+            },
+            "required": ["action"]
+        }
+    },
+    {
+        "name": "open_application",
+        "description": "Open an application on the user's laptop by name.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "app_name": {"type": "string", "description": "Name of the app to open e.g. spotify, vs code, chrome"}
+            },
+            "required": ["app_name"]
+        }
+    },
+    {
+        "name": "open_website",
+        "description": "Open a website or URL in the browser.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "url": {"type": "string", "description": "URL or website to open"}
+            },
+            "required": ["url"]
+        }
+    },
+    {
+        "name": "youtube_search",
+        "description": "Search YouTube and open the results in the browser.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "query": {"type": "string", "description": "Search query for YouTube"}
+            },
+            "required": ["query"]
+        }
+    },
+    {
+        "name": "focus_on",
+        "description": "Turn on focus mode — blocks distracting websites like YouTube, Instagram, Reddit.",
+        "input_schema": {"type": "object", "properties": {}, "required": []}
+    },
+    {
+        "name": "focus_off",
+        "description": "Turn off focus mode — unblocks all websites.",
+        "input_schema": {"type": "object", "properties": {}, "required": []}
+    },
+    {
+    "name": "browser_history",
+    "description": "Search the user's Chrome browser history by keyword. Use this when user says 'search my history', 'what did I visit', 'find in my browser history', or anything about past browsing.",
+    "input_schema": {
+        "type": "object",
+        "properties": {
+            "query": {"type": "string", "description": "Keyword to search in browser history"}
+        },
+        "required": ["query"]
     }
+}
 ]
 
 BASE_SYSTEM_PROMPT = f"""You are FRIDAY, a smart and efficient personal assistant.
 Today's date is {datetime.now().strftime('%A, %B %d %Y')}.
+You have a browser_history tool — ALWAYS use it when asked about browser history or visited sites
 You are helpful, concise, and professional.
 You remember everything said in this conversation.
 When you don't know something, use your tools to find out.
@@ -206,6 +240,27 @@ def execute_tool(tool_name, tool_input):
             tool_input.get("description", ""),
             tool_input.get("location", "")
         )
+    elif tool_name == "spotify_play_song":
+        return spotify_play_song(tool_input["query"])
+    elif tool_name == "spotify_play_list":
+        return spotify_play_list(tool_input["name"])
+    elif tool_name == "spotify_control":
+        return spotify_control(tool_input["action"])
+    elif tool_name == "open_application":
+        return open_application(tool_input["app_name"])
+    elif tool_name == "open_website":
+        return open_website(tool_input["url"])
+    elif tool_name == "youtube_search":
+        return youtube_search(tool_input["query"])
+    elif tool_name == "focus_on":
+        return focus_on()
+    elif tool_name == "focus_off":
+        return focus_off()
+    elif tool_name == "browser_history":
+        return browser_history(tool_input["query"])
+    elif tool_name == "browser_history":
+        result = browser_history(tool_input["query"])
+        return result
     else:
         return f"Unknown tool: {tool_name}"
 
@@ -217,10 +272,7 @@ def chat(user_message):
         full_system_prompt += f"\n{memory_context}"
     full_system_prompt += get_behaviour_context()
 
-    conversation_history.append({
-        "role": "user",
-        "content": user_message
-    })
+    conversation_history.append({"role": "user", "content": user_message})
 
     while True:
         response = client.messages.create(
@@ -232,10 +284,7 @@ def chat(user_message):
         )
 
         if response.stop_reason == "tool_use":
-            conversation_history.append({
-                "role": "assistant",
-                "content": response.content
-            })
+            conversation_history.append({"role": "assistant", "content": response.content})
 
             tool_results = []
             for block in response.content:
@@ -251,10 +300,7 @@ def chat(user_message):
                         "content": str(tool_result)
                     })
 
-            conversation_history.append({
-                "role": "user",
-                "content": tool_results
-            })
+            conversation_history.append({"role": "user", "content": tool_results})
 
         else:
             friday_reply = ""
@@ -266,10 +312,7 @@ def chat(user_message):
             if not friday_reply:
                 friday_reply = "I couldn't generate a response. Please try again."
 
-            conversation_history.append({
-                "role": "assistant",
-                "content": friday_reply
-            })
+            conversation_history.append({"role": "assistant", "content": friday_reply})
 
             memory.save_memory(f"User: {user_message} | FRIDAY: {friday_reply}")
             tools_used = [b.name for b in response.content if hasattr(b, 'type') and b.type == 'tool_use']
@@ -296,7 +339,6 @@ voice.on_wake_word = activate_voice_mode
 
 start_wake_word_listener()
 
-# ── WEEKLY SUMMARY CHECK ON STARTUP ──────────────────────────────────────────
 if is_weekly_summary_due():
     print("\nFRIDAY: Hey, it's Sunday — time for your weekly summary. Generating...\n")
     summary = generate_weekly_summary()
@@ -374,8 +416,17 @@ while True:
         print("FRIDAY: Logged to Obsidian.\n")
         continue
 
-    response = chat(user_input)
-    print(f"\nFRIDAY: {response}\n")
+    if not is_complex(user_input) and is_ollama_running():
+        response = ask_ollama(user_input, conversation_history)
+        if response:
+            print(f"\nFRIDAY (local): {response}\n")
+            log_interaction(user_input, response, [])
+        else:
+            response = chat(user_input)
+            print(f"\nFRIDAY: {response}\n")
+    else:
+        response = chat(user_input)
+        print(f"\nFRIDAY: {response}\n")
 
     if MODE in ("voice", "hybrid"):
         try:

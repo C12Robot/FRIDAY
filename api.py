@@ -17,7 +17,11 @@ import re
 from anthropic import Anthropic
 from dotenv import load_dotenv
 from memory import FridayMemory
-from tools import web_search, read_file, write_file, gmail_read, gmail_send, gmail_search, calendar_get, calendar_create
+from tools import (web_search, read_file, write_file, gmail_read, gmail_send, gmail_search,
+                   calendar_get, calendar_create, spotify_play_song, spotify_play_list,
+                   spotify_control, open_application, open_website, youtube_search,
+                   focus_on, focus_off, browser_history)
+from behaviour import log_interaction, get_behaviour_context
 
 load_dotenv()
 
@@ -25,7 +29,7 @@ app = FastAPI()
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"]
@@ -79,9 +83,7 @@ TOOL_DEFINITIONS = [
         "description": "Search emails.",
         "input_schema": {
             "type": "object",
-            "properties": {
-                "query": {"type": "string"}
-            },
+            "properties": {"query": {"type": "string"}},
             "required": ["query"]
         }
     },
@@ -110,15 +112,13 @@ TOOL_DEFINITIONS = [
         "description": "Read a file from the laptop.",
         "input_schema": {
             "type": "object",
-            "properties": {
-                "path": {"type": "string"}
-            },
+            "properties": {"path": {"type": "string"}},
             "required": ["path"]
         }
     },
     {
         "name": "write_file",
-        "description": "Write a file to the laptop.",
+        "description": "Write a file to the laptop. When writing to Obsidian logs use path: C:\\Users\\meena\\Documents\\Builder_Brain\\FRIDAY'S LOGS\\Daily Log.md",
         "input_schema": {
             "type": "object",
             "properties": {
@@ -126,6 +126,79 @@ TOOL_DEFINITIONS = [
                 "content": {"type": "string"}
             },
             "required": ["path", "content"]
+        }
+    },
+    {
+        "name": "spotify_play_song",
+        "description": "Play a song on Spotify.",
+        "input_schema": {
+            "type": "object",
+            "properties": {"query": {"type": "string"}},
+            "required": ["query"]
+        }
+    },
+    {
+        "name": "spotify_play_list",
+        "description": "Play a playlist on Spotify by name.",
+        "input_schema": {
+            "type": "object",
+            "properties": {"name": {"type": "string"}},
+            "required": ["name"]
+        }
+    },
+    {
+        "name": "spotify_control",
+        "description": "Control Spotify — pause, next, or current.",
+        "input_schema": {
+            "type": "object",
+            "properties": {"action": {"type": "string", "description": "pause, next, or current"}},
+            "required": ["action"]
+        }
+    },
+    {
+        "name": "open_application",
+        "description": "Open an application on the laptop by name e.g. spotify, chrome, vs code.",
+        "input_schema": {
+            "type": "object",
+            "properties": {"app_name": {"type": "string"}},
+            "required": ["app_name"]
+        }
+    },
+    {
+        "name": "open_website",
+        "description": "Open a website or URL in the browser.",
+        "input_schema": {
+            "type": "object",
+            "properties": {"url": {"type": "string"}},
+            "required": ["url"]
+        }
+    },
+    {
+        "name": "youtube_search",
+        "description": "Search YouTube and open results in browser.",
+        "input_schema": {
+            "type": "object",
+            "properties": {"query": {"type": "string"}},
+            "required": ["query"]
+        }
+    },
+    {
+        "name": "focus_on",
+        "description": "Turn on focus mode — blocks distracting websites.",
+        "input_schema": {"type": "object", "properties": {}, "required": []}
+    },
+    {
+        "name": "focus_off",
+        "description": "Turn off focus mode — unblocks all websites.",
+        "input_schema": {"type": "object", "properties": {}, "required": []}
+    },
+    {
+        "name": "browser_history",
+        "description": "Search Chrome browser history. ALWAYS use this when asked about browser history or visited sites.",
+        "input_schema": {
+            "type": "object",
+            "properties": {"query": {"type": "string"}},
+            "required": ["query"]
         }
     }
 ]
@@ -135,6 +208,7 @@ Today's date is {datetime.now().strftime('%A, %B %d %Y')}.
 You are helpful, concise, and professional.
 You remember everything said in this conversation.
 When you don't know something, use your tools to find out.
+When writing logs to Obsidian always use: C:\\Users\\meena\\Documents\\Builder_Brain\\FRIDAY'S LOGS\\Daily Log.md
 Present information directly and concisely."""
 
 
@@ -161,6 +235,24 @@ def execute_tool(tool_name, tool_input):
             tool_input.get("description", ""),
             tool_input.get("location", "")
         )
+    elif tool_name == "spotify_play_song":
+        return spotify_play_song(tool_input["query"])
+    elif tool_name == "spotify_play_list":
+        return spotify_play_list(tool_input["name"])
+    elif tool_name == "spotify_control":
+        return spotify_control(tool_input["action"])
+    elif tool_name == "open_application":
+        return open_application(tool_input["app_name"])
+    elif tool_name == "open_website":
+        return open_website(tool_input["url"])
+    elif tool_name == "youtube_search":
+        return youtube_search(tool_input["query"])
+    elif tool_name == "focus_on":
+        return focus_on()
+    elif tool_name == "focus_off":
+        return focus_off()
+    elif tool_name == "browser_history":
+        return browser_history(tool_input["query"])
     else:
         return f"Unknown tool: {tool_name}"
 
@@ -171,7 +263,7 @@ async def chat(request: MessageRequest):
     tools_used = []
 
     memory_context = memory.build_memory_prompt(user_message)
-    full_system_prompt = BASE_SYSTEM_PROMPT
+    full_system_prompt = BASE_SYSTEM_PROMPT + get_behaviour_context()
     if memory_context:
         full_system_prompt += f"\n{memory_context}"
 
@@ -241,6 +333,7 @@ async def chat(request: MessageRequest):
             })
 
             memory.save_memory(f"User: {user_message} | FRIDAY: {friday_reply}")
+            log_interaction(user_message, friday_reply, tools_used)
             return MessageResponse(reply=friday_reply, tools_used=tools_used)
 
 @app.get("/memories")
@@ -249,10 +342,8 @@ async def get_memories():
         count = memory.collection.count()
         if count == 0:
             return {"memories": [], "count": 0}
-        
         results = memory.collection.get()
         memories = results.get("documents", [])
-        
         return {"memories": memories, "count": count}
     except Exception as e:
         return {"memories": [], "count": 0, "error": str(e)}
