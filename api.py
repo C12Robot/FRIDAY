@@ -19,7 +19,9 @@ from memory import FridayMemory
 from tools import (web_search, read_file, write_file, gmail_read, gmail_send, gmail_search,
                    calendar_get, calendar_create, calendar_delete, spotify_play_song,
                    spotify_play_list, spotify_control, open_application, open_website,
-                   youtube_search, focus_on, focus_off, browser_history)
+                   youtube_search, focus_on, focus_off, browser_history,
+                   finance_log_trade, finance_market_prices, finance_sentiment,
+                   finance_weekly_pnl, finance_patterns)
 from behaviour import log_interaction, get_behaviour_context
 from briefing import get_briefing_if_due, get_market_brief
 from scheduler import start_scheduler, get_notifications, clear_notifications, set_dnd
@@ -120,7 +122,7 @@ TOOL_DEFINITIONS = [
         "description": "Delete a calendar event by its ID. Use calendar_get first to get the event ID.",
         "input_schema": {
             "type": "object",
-            "properties": {"event_id": {"type": "string", "description": "The event ID from calendar_get"}},
+            "properties": {"event_id": {"type": "string"}},
             "required": ["event_id"]
         }
     },
@@ -222,10 +224,46 @@ TOOL_DEFINITIONS = [
         "name": "market_brief",
         "description": "Get latest Gold price and MES1 Micro E-mini S&P 500 futures update.",
         "input_schema": {"type": "object", "properties": {}, "required": []}
+    },
+    {
+        "name": "finance_log_trade",
+        "description": "Log a trade to the trading journal in Obsidian. Use when user mentions buying, selling, entering or exiting a trade.",
+        "input_schema": {
+            "type": "object",
+            "properties": {"entry_text": {"type": "string", "description": "Trade details as described by user"}},
+            "required": ["entry_text"]
+        }
+    },
+    {
+        "name": "finance_market_prices",
+        "description": "Get current prices for MES1, MGCJ25 and Gold.",
+        "input_schema": {"type": "object", "properties": {}, "required": []}
+    },
+    {
+        "name": "finance_sentiment",
+        "description": "Get news sentiment analysis for a specific asset.",
+        "input_schema": {
+            "type": "object",
+            "properties": {"asset": {"type": "string", "description": "Asset name e.g. MES1, MGCJ25, Gold"}},
+            "required": ["asset"]
+        }
+    },
+    {
+        "name": "finance_weekly_pnl",
+        "description": "Get weekly P&L summary from the trading journal.",
+        "input_schema": {"type": "object", "properties": {}, "required": []}
+    },
+    {
+        "name": "finance_patterns",
+        "description": "Analyse trading patterns from the journal.",
+        "input_schema": {"type": "object", "properties": {}, "required": []}
     }
 ]
 
-NEEDS_CONFIRMATION = {"write_file", "gmail_send", "calendar_create", "calendar_delete"}
+NEEDS_CONFIRMATION = {
+    "write_file", "gmail_send", "calendar_create",
+    "calendar_delete", "finance_log_trade"
+}
 
 BASE_SYSTEM_PROMPT = f"""You are FRIDAY, a smart and efficient personal assistant.
 Today's date is {datetime.now().strftime('%A, %B %d %Y')}.
@@ -266,6 +304,14 @@ def execute_tool_direct(tool_name, tool_input):
         return browser_history(tool_input["query"])
     elif tool_name == "market_brief":
         return get_market_brief()
+    elif tool_name == "finance_market_prices":
+        return finance_market_prices()
+    elif tool_name == "finance_sentiment":
+        return finance_sentiment(tool_input["asset"])
+    elif tool_name == "finance_weekly_pnl":
+        return finance_weekly_pnl()
+    elif tool_name == "finance_patterns":
+        return finance_patterns()
     else:
         return f"Unknown tool: {tool_name}"
 
@@ -293,6 +339,8 @@ def execute_tool_confirmed(tool_name, tool_input):
         )
     elif tool_name == "calendar_delete":
         return calendar_delete(tool_input["event_id"])
+    elif tool_name == "finance_log_trade":
+        return finance_log_trade(tool_input["entry_text"])
     return "Action completed."
 
 
@@ -346,6 +394,8 @@ async def chat(request: MessageRequest):
                         details = f"Create event: {tool_input['summary']}\nTime: {tool_input['start_time']} → {tool_input['end_time']}"
                     elif tool_name == "calendar_delete":
                         details = f"Delete calendar event\nEvent ID: {tool_input['event_id']}"
+                    elif tool_name == "finance_log_trade":
+                        details = f"Log trade to Trading Journal:\n{tool_input['entry_text']}"
                     else:
                         details = str(tool_input)
                     conf_needed = (conf_id, details)
@@ -427,10 +477,11 @@ async def confirm_action(request: ConfirmRequest):
     })
 
     action_descriptions = {
-        "write_file":      f"Done. Written to {tool_input.get('path', 'file')}.",
-        "gmail_send":      f"Email sent to {tool_input.get('to', '')}.",
-        "calendar_create": f"Event '{tool_input.get('summary', '')}' created.",
-        "calendar_delete": "Event deleted successfully."
+        "write_file":        f"Done. Written to {tool_input.get('path', 'file')}.",
+        "gmail_send":        f"Email sent to {tool_input.get('to', '')}.",
+        "calendar_create":   f"Event '{tool_input.get('summary', '')}' created.",
+        "calendar_delete":   "Event deleted successfully.",
+        "finance_log_trade": "Trade logged to journal."
     }
     friday_reply = action_descriptions.get(tool_name, "Done.")
 

@@ -2,6 +2,7 @@ from calendar_tool import get_upcoming_events, create_event, delete_event
 from gmail import read_emails, send_email, search_emails
 from spotify import spotify_play, spotify_pause, spotify_next, spotify_current, spotify_play_playlist
 from automation import open_app, open_url, search_youtube, focus_mode_on, focus_mode_off, search_browser_history
+from finance import log_trade, get_market_prices, get_sentiment, get_weekly_pnl, get_trading_patterns
 import requests
 import os
 
@@ -114,3 +115,18 @@ def focus_off():
 
 def browser_history(query):
     return search_browser_history(query)
+
+def finance_log_trade(entry_text):
+    return log_trade(entry_text)
+
+def finance_market_prices():
+    return get_market_prices()
+
+def finance_sentiment(asset):
+    return get_sentiment(asset)
+
+def finance_weekly_pnl():
+    return get_weekly_pnl()
+
+def finance_patterns():
+    return get_trading_patterns()
