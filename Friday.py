@@ -212,7 +212,8 @@ You are helpful, concise, and professional.
 You remember everything said in this conversation.
 When you don't know something, use your tools to find out.
 Present information directly without preamble like 'Based on my search' or 'I found that'.
-Keep responses concise — you are speaking out loud, so avoid long lists or bullet points."""
+Keep responses concise — you are speaking out loud, so avoid long lists or bullet points.
+Never ask the user for confirmation in chat. Just use the tool directly — the system will handle confirmations automatically via popup."""
 
 conversation_history = []
 

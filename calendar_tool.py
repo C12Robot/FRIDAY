@@ -40,7 +40,6 @@ def get_calendar_service():
 def get_upcoming_events(max_results=10):
     try:
         service = get_calendar_service()
-
         now = datetime.utcnow().isoformat() + 'Z'
 
         events_result = service.events().list(
@@ -58,9 +57,10 @@ def get_upcoming_events(max_results=10):
 
         formatted = []
         for event in events:
-            start = event['start'].get('dateTime', event['start'].get('date'))
+            start   = event['start'].get('dateTime', event['start'].get('date'))
             summary = event.get('summary', 'No title')
             location = event.get('location', '')
+            event_id = event.get('id', '')
 
             try:
                 dt = datetime.fromisoformat(start.replace('Z', '+00:00'))
@@ -68,7 +68,7 @@ def get_upcoming_events(max_results=10):
             except:
                 start_formatted = start
 
-            entry = f"{summary} — {start_formatted}"
+            entry = f"{summary} — {start_formatted} [id:{event_id}]"
             if location:
                 entry += f" at {location}"
             formatted.append(entry)
@@ -80,18 +80,6 @@ def get_upcoming_events(max_results=10):
 
 
 def create_event(summary, start_time, end_time, description="", location=""):
-    print(f"\n⚠️  FRIDAY wants to create a calendar event:")
-    print(f"   Title: {summary}")
-    print(f"   Start: {start_time}")
-    print(f"   End:   {end_time}")
-    if location:
-        print(f"   Location: {location}")
-
-    confirm = input("Confirm? (yes/no): ").strip().lower()
-
-    if confirm != "yes":
-        return "Event creation cancelled."
-
     try:
         service = get_calendar_service()
 
@@ -118,3 +106,15 @@ def create_event(summary, start_time, end_time, description="", location=""):
 
     except Exception as e:
         return f"Error creating event: {str(e)}"
+
+
+def delete_event(event_id):
+    try:
+        service = get_calendar_service()
+        service.events().delete(
+            calendarId='primary',
+            eventId=event_id
+        ).execute()
+        return f"Event deleted successfully."
+    except Exception as e:
+        return f"Error deleting event: {str(e)}"

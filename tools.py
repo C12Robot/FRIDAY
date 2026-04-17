@@ -1,41 +1,27 @@
-from calendar_tool import get_upcoming_events, create_event
+from calendar_tool import get_upcoming_events, create_event, delete_event
 from gmail import read_emails, send_email, search_emails
 from spotify import spotify_play, spotify_pause, spotify_next, spotify_current, spotify_play_playlist
-from automation import open_app, open_url, search_youtube, focus_mode_on, focus_mode_off
+from automation import open_app, open_url, search_youtube, focus_mode_on, focus_mode_off, search_browser_history
 import requests
 import os
-from automation import open_app, open_url, search_youtube, focus_mode_on, focus_mode_off, search_browser_history
 
 
 def web_search(query):
     url = "https://api.tavily.com/search"
-
     headers = {
         "Authorization": f"Bearer {os.getenv('TAVILY_API_KEY')}",
         "Content-Type": "application/json"
     }
-
-    payload = {
-        "query": query,
-        "search_depth": "basic",
-        "max_results": 5
-    }
-
+    payload = {"query": query, "search_depth": "basic", "max_results": 5}
     try:
         response = requests.post(url, json=payload, headers=headers)
         data = response.json()
-
         formatted = ""
         for i, r in enumerate(data.get("results", [])[:3], 1):
-            title = r.get("title", "")
+            title   = r.get("title", "")
             content = r.get("content", "")[:300]
             formatted += f"{i}. {title}\n{content}\n\n"
-
-        if not formatted:
-            return "No results found."
-
-        return formatted.strip()
-
+        return formatted.strip() if formatted else "No results found."
     except Exception as e:
         return f"Search failed: {str(e)}"
 
@@ -43,7 +29,6 @@ def web_search(query):
 def read_file(path):
     if not os.path.exists(path):
         return f"File not found at: {path}"
-
     try:
         with open(path, "r", encoding="utf-8") as f:
             return f.read()
@@ -52,16 +37,8 @@ def read_file(path):
 
 
 def write_file(path, content):
-    print(f"\n⚠️  FRIDAY wants to write to: {path}")
-    print(f"Preview: {content[:100]}...")
-
-    confirm = input("Confirm? (yes/no): ").strip().lower()
-
-    if confirm != "yes":
-        return "Write cancelled by user."
-
+    mode = "a" if ".md" in path else "w"
     try:
-        mode = "a" if "FRIDAY'S LOGS" in path or ".md" in path else "w"
         with open(path, mode, encoding="utf-8") as f:
             f.write("\n" + content)
         return f"File written successfully to {path}"
@@ -84,15 +61,17 @@ def gmail_search(query):
 def calendar_get(input=None):
     try:
         result = get_upcoming_events()
-        print(f"[CALENDAR RESULT: {result}]", flush=True)
         return result
     except Exception as e:
-        print(f"[CALENDAR ERROR: {e}]", flush=True)
         return f"Calendar error: {str(e)}"
 
 
 def calendar_create(summary, start_time, end_time, description="", location=""):
     return create_event(summary, start_time, end_time, description, location)
+
+
+def calendar_delete(event_id):
+    return delete_event(event_id)
 
 
 def spotify_play_song(query):
@@ -134,5 +113,4 @@ def focus_off():
 
 
 def browser_history(query):
-    result = search_browser_history(query)
-    return result
+    return search_browser_history(query)

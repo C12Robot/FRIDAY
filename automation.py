@@ -83,20 +83,14 @@ def focus_mode_off():
     try:
         with open(HOSTS_FILE, 'r') as f:
             lines = f.readlines()
-        
-        cleaned = []
-        skip = False
-        for line in lines:
-            if "# FRIDAY Focus Mode" in line:
-                skip = True
-            if not skip:
-                cleaned.append(line)
-            if skip and line.strip() == "":
-                skip = False
-        
+
+        cleaned = [line for line in lines
+                   if not any(site in line for site in BLOCKED_SITES)
+                   and "# FRIDAY Focus Mode" not in line]
+
         with open(HOSTS_FILE, 'w') as f:
             f.writelines(cleaned)
-        
+
         focus_mode_active = False
         return "Focus mode off. Sites unblocked."
     except PermissionError:

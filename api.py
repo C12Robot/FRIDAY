@@ -1,6 +1,7 @@
 import warnings
 import logging
 import os
+import uuid
 
 warnings.filterwarnings("ignore")
 logging.getLogger("faster_whisper").setLevel(logging.ERROR)
@@ -12,16 +13,16 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from datetime import datetime
-import json
-import re
 from anthropic import Anthropic
 from dotenv import load_dotenv
 from memory import FridayMemory
 from tools import (web_search, read_file, write_file, gmail_read, gmail_send, gmail_search,
-                   calendar_get, calendar_create, spotify_play_song, spotify_play_list,
-                   spotify_control, open_application, open_website, youtube_search,
-                   focus_on, focus_off, browser_history)
+                   calendar_get, calendar_create, calendar_delete, spotify_play_song,
+                   spotify_play_list, spotify_control, open_application, open_website,
+                   youtube_search, focus_on, focus_off, browser_history)
 from behaviour import log_interaction, get_behaviour_context
+from briefing import get_briefing_if_due, get_market_brief
+from scheduler import start_scheduler, get_notifications, clear_notifications, set_dnd
 
 load_dotenv()
 
@@ -37,9 +38,11 @@ app.add_middleware(
 
 client = Anthropic()
 memory = FridayMemory()
+scheduler = start_scheduler()
 
 conversation_history = []
 action_log = []
+pending_confirmation = {}
 
 class MessageRequest(BaseModel):
     message: str
@@ -47,6 +50,13 @@ class MessageRequest(BaseModel):
 class MessageResponse(BaseModel):
     reply: str
     tools_used: list
+    needs_confirmation: bool = False
+    confirmation_id: str = ""
+    confirmation_details: str = ""
+
+class ConfirmRequest(BaseModel):
+    confirmation_id: str
+    confirmed: bool
 
 TOOL_DEFINITIONS = [
     {
@@ -54,9 +64,7 @@ TOOL_DEFINITIONS = [
         "description": "Search the internet for current information.",
         "input_schema": {
             "type": "object",
-            "properties": {
-                "query": {"type": "string", "description": "Search query"}
-            },
+            "properties": {"query": {"type": "string"}},
             "required": ["query"]
         }
     },
@@ -67,7 +75,7 @@ TOOL_DEFINITIONS = [
     },
     {
         "name": "gmail_send",
-        "description": "Send an email.",
+        "description": "Send an email. Always confirm before sending.",
         "input_schema": {
             "type": "object",
             "properties": {
@@ -89,12 +97,12 @@ TOOL_DEFINITIONS = [
     },
     {
         "name": "calendar_get",
-        "description": "Get upcoming calendar events.",
+        "description": "Get upcoming calendar events. Returns events with their IDs.",
         "input_schema": {"type": "object", "properties": {}, "required": []}
     },
     {
         "name": "calendar_create",
-        "description": "Create a calendar event.",
+        "description": "Create a calendar event. Always confirm before creating.",
         "input_schema": {
             "type": "object",
             "properties": {
@@ -108,6 +116,15 @@ TOOL_DEFINITIONS = [
         }
     },
     {
+        "name": "calendar_delete",
+        "description": "Delete a calendar event by its ID. Use calendar_get first to get the event ID.",
+        "input_schema": {
+            "type": "object",
+            "properties": {"event_id": {"type": "string", "description": "The event ID from calendar_get"}},
+            "required": ["event_id"]
+        }
+    },
+    {
         "name": "read_file",
         "description": "Read a file from the laptop.",
         "input_schema": {
@@ -118,7 +135,7 @@ TOOL_DEFINITIONS = [
     },
     {
         "name": "write_file",
-        "description": "Write a file to the laptop. When writing to Obsidian logs use path: C:\\Users\\meena\\Documents\\Builder_Brain\\FRIDAY'S LOGS\\Daily Log.md",
+        "description": "Write a file. For Obsidian logs use: C:\\Users\\meena\\Documents\\Builder_Brain\\FRIDAY'S LOGS\\Daily Log.md",
         "input_schema": {
             "type": "object",
             "properties": {
@@ -139,7 +156,7 @@ TOOL_DEFINITIONS = [
     },
     {
         "name": "spotify_play_list",
-        "description": "Play a playlist on Spotify by name.",
+        "description": "Play a playlist on Spotify.",
         "input_schema": {
             "type": "object",
             "properties": {"name": {"type": "string"}},
@@ -148,16 +165,16 @@ TOOL_DEFINITIONS = [
     },
     {
         "name": "spotify_control",
-        "description": "Control Spotify — pause, next, or current.",
+        "description": "Control Spotify — pause, next, current.",
         "input_schema": {
             "type": "object",
-            "properties": {"action": {"type": "string", "description": "pause, next, or current"}},
+            "properties": {"action": {"type": "string"}},
             "required": ["action"]
         }
     },
     {
         "name": "open_application",
-        "description": "Open an application on the laptop by name e.g. spotify, chrome, vs code.",
+        "description": "Open an app on the laptop e.g. spotify, chrome, vs code.",
         "input_schema": {
             "type": "object",
             "properties": {"app_name": {"type": "string"}},
@@ -166,7 +183,7 @@ TOOL_DEFINITIONS = [
     },
     {
         "name": "open_website",
-        "description": "Open a website or URL in the browser.",
+        "description": "Open a website in the browser.",
         "input_schema": {
             "type": "object",
             "properties": {"url": {"type": "string"}},
@@ -175,7 +192,7 @@ TOOL_DEFINITIONS = [
     },
     {
         "name": "youtube_search",
-        "description": "Search YouTube and open results in browser.",
+        "description": "Search YouTube and open in browser.",
         "input_schema": {
             "type": "object",
             "properties": {"query": {"type": "string"}},
@@ -184,57 +201,51 @@ TOOL_DEFINITIONS = [
     },
     {
         "name": "focus_on",
-        "description": "Turn on focus mode — blocks distracting websites.",
+        "description": "Turn on focus mode.",
         "input_schema": {"type": "object", "properties": {}, "required": []}
     },
     {
         "name": "focus_off",
-        "description": "Turn off focus mode — unblocks all websites.",
+        "description": "Turn off focus mode.",
         "input_schema": {"type": "object", "properties": {}, "required": []}
     },
     {
         "name": "browser_history",
-        "description": "Search Chrome browser history. ALWAYS use this when asked about browser history or visited sites.",
+        "description": "Search Chrome browser history. ALWAYS use when asked about visited sites or browser history.",
         "input_schema": {
             "type": "object",
             "properties": {"query": {"type": "string"}},
             "required": ["query"]
         }
+    },
+    {
+        "name": "market_brief",
+        "description": "Get latest Gold price and MES1 Micro E-mini S&P 500 futures update.",
+        "input_schema": {"type": "object", "properties": {}, "required": []}
     }
 ]
+
+NEEDS_CONFIRMATION = {"write_file", "gmail_send", "calendar_create", "calendar_delete"}
 
 BASE_SYSTEM_PROMPT = f"""You are FRIDAY, a smart and efficient personal assistant.
 Today's date is {datetime.now().strftime('%A, %B %d %Y')}.
 You are helpful, concise, and professional.
 You remember everything said in this conversation.
-When you don't know something, use your tools to find out.
-When writing logs to Obsidian always use: C:\\Users\\meena\\Documents\\Builder_Brain\\FRIDAY'S LOGS\\Daily Log.md
+IMPORTANT: When writing logs to Obsidian always use EXACTLY: C:\\Users\\meena\\Documents\\Builder_Brain\\FRIDAY'S LOGS\\Daily Log.md
 Present information directly and concisely."""
 
 
-def execute_tool(tool_name, tool_input):
+def execute_tool_direct(tool_name, tool_input):
     if tool_name == "web_search":
         return web_search(tool_input["query"])
     elif tool_name == "read_file":
         return read_file(tool_input["path"])
-    elif tool_name == "write_file":
-        return write_file(tool_input["path"], tool_input["content"])
     elif tool_name == "gmail_read":
         return gmail_read()
-    elif tool_name == "gmail_send":
-        return gmail_send(tool_input["to"], tool_input["subject"], tool_input["body"])
     elif tool_name == "gmail_search":
         return gmail_search(tool_input["query"])
     elif tool_name == "calendar_get":
         return calendar_get()
-    elif tool_name == "calendar_create":
-        return calendar_create(
-            tool_input["summary"],
-            tool_input["start_time"],
-            tool_input["end_time"],
-            tool_input.get("description", ""),
-            tool_input.get("location", "")
-        )
     elif tool_name == "spotify_play_song":
         return spotify_play_song(tool_input["query"])
     elif tool_name == "spotify_play_list":
@@ -253,24 +264,49 @@ def execute_tool(tool_name, tool_input):
         return focus_off()
     elif tool_name == "browser_history":
         return browser_history(tool_input["query"])
+    elif tool_name == "market_brief":
+        return get_market_brief()
     else:
         return f"Unknown tool: {tool_name}"
+
+
+def execute_tool_confirmed(tool_name, tool_input):
+    if tool_name == "write_file":
+        path    = tool_input["path"]
+        content = tool_input["content"]
+        mode    = "a" if ".md" in path else "w"
+        try:
+            with open(path, mode, encoding="utf-8") as f:
+                f.write("\n" + content)
+            return f"Written to {path}"
+        except Exception as e:
+            return f"Write error: {str(e)}"
+    elif tool_name == "gmail_send":
+        return gmail_send(tool_input["to"], tool_input["subject"], tool_input["body"])
+    elif tool_name == "calendar_create":
+        return calendar_create(
+            tool_input["summary"],
+            tool_input["start_time"],
+            tool_input["end_time"],
+            tool_input.get("description", ""),
+            tool_input.get("location", "")
+        )
+    elif tool_name == "calendar_delete":
+        return calendar_delete(tool_input["event_id"])
+    return "Action completed."
 
 
 @app.post("/chat")
 async def chat(request: MessageRequest):
     user_message = request.message
-    tools_used = []
+    tools_used   = []
 
-    memory_context = memory.build_memory_prompt(user_message)
+    memory_context     = memory.build_memory_prompt(user_message)
     full_system_prompt = BASE_SYSTEM_PROMPT + get_behaviour_context()
     if memory_context:
         full_system_prompt += f"\n{memory_context}"
 
-    conversation_history.append({
-        "role": "user",
-        "content": user_message
-    })
+    conversation_history.append({"role": "user", "content": user_message})
 
     while True:
         response = client.messages.create(
@@ -282,40 +318,70 @@ async def chat(request: MessageRequest):
         )
 
         if response.stop_reason == "tool_use":
-            conversation_history.append({
-                "role": "assistant",
-                "content": response.content
-            })
+            conversation_history.append({"role": "assistant", "content": response.content})
 
             tool_results = []
+            conf_needed  = None
+
             for block in response.content:
-                if block.type == "tool_use":
-                    tool_name = block.name
-                    tool_input = block.input
-                    tools_used.append(tool_name)
+                if block.type != "tool_use":
+                    continue
 
-                    try:
-                        tool_result = execute_tool(tool_name, tool_input)
-                    except Exception as e:
-                        tool_result = f"Tool error: {str(e)}"
+                tool_name  = block.name
+                tool_input = block.input
+                tools_used.append(tool_name)
 
-                    action_log.append({
-                        "timestamp": datetime.now().strftime("%H:%M:%S"),
-                        "tool": tool_name,
-                        "input": str(tool_input),
-                        "result": str(tool_result)[:200]
-                    })
+                if tool_name in NEEDS_CONFIRMATION:
+                    conf_id = str(uuid.uuid4())[:8]
+                    pending_confirmation[conf_id] = {
+                        "tool_name":   tool_name,
+                        "tool_input":  tool_input,
+                        "tool_use_id": block.id
+                    }
+                    if tool_name == "write_file":
+                        details = f"Write to:\n{tool_input['path']}\n\nPreview:\n{tool_input['content'][:300]}"
+                    elif tool_name == "gmail_send":
+                        details = f"Send email to: {tool_input['to']}\nSubject: {tool_input['subject']}\n\n{tool_input['body'][:300]}"
+                    elif tool_name == "calendar_create":
+                        details = f"Create event: {tool_input['summary']}\nTime: {tool_input['start_time']} → {tool_input['end_time']}"
+                    elif tool_name == "calendar_delete":
+                        details = f"Delete calendar event\nEvent ID: {tool_input['event_id']}"
+                    else:
+                        details = str(tool_input)
+                    conf_needed = (conf_id, details)
+                    break
 
-                    tool_results.append({
-                        "type": "tool_result",
-                        "tool_use_id": block.id,
-                        "content": str(tool_result)
-                    })
+                try:
+                    tool_result = execute_tool_direct(tool_name, tool_input)
+                except Exception as e:
+                    tool_result = f"Tool error: {str(e)}"
 
-            conversation_history.append({
-                "role": "user",
-                "content": tool_results
-            })
+                action_log.append({
+                    "timestamp": datetime.now().strftime("%H:%M:%S"),
+                    "tool":      tool_name,
+                    "input":     str(tool_input),
+                    "result":    str(tool_result)[:200]
+                })
+
+                tool_results.append({
+                    "type":        "tool_result",
+                    "tool_use_id": block.id,
+                    "content":     str(tool_result)
+                })
+
+            if conf_needed:
+                conversation_history.pop()
+                conf_id, details = conf_needed
+                return MessageResponse(
+                    reply="I need your confirmation before proceeding.",
+                    tools_used=tools_used,
+                    needs_confirmation=True,
+                    confirmation_id=conf_id,
+                    confirmation_details=details
+                )
+
+            if tool_results:
+                conversation_history.append({"role": "user", "content": tool_results})
 
         else:
             friday_reply = ""
@@ -325,16 +391,87 @@ async def chat(request: MessageRequest):
                     break
 
             if not friday_reply:
-                friday_reply = "I couldn't generate a response. Please try again."
+                friday_reply = "I couldn't generate a response."
 
-            conversation_history.append({
-                "role": "assistant",
-                "content": friday_reply
-            })
-
+            conversation_history.append({"role": "assistant", "content": friday_reply})
             memory.save_memory(f"User: {user_message} | FRIDAY: {friday_reply}")
             log_interaction(user_message, friday_reply, tools_used)
             return MessageResponse(reply=friday_reply, tools_used=tools_used)
+
+
+@app.post("/confirm")
+async def confirm_action(request: ConfirmRequest):
+    conf_id = request.confirmation_id
+    if conf_id not in pending_confirmation:
+        return {"status": "error", "message": "Confirmation ID not found"}
+
+    pending    = pending_confirmation.pop(conf_id)
+    tool_name  = pending["tool_name"]
+    tool_input = pending["tool_input"]
+
+    if not request.confirmed:
+        conversation_history.append({"role": "user", "content": "Action was cancelled by user."})
+        conversation_history.append({"role": "assistant", "content": "Action cancelled."})
+        return {"status": "cancelled", "reply": "Action cancelled."}
+
+    try:
+        result = execute_tool_confirmed(tool_name, tool_input)
+    except Exception as e:
+        result = f"Error: {str(e)}"
+
+    action_log.append({
+        "timestamp": datetime.now().strftime("%H:%M:%S"),
+        "tool":      tool_name,
+        "input":     str(tool_input),
+        "result":    str(result)[:200]
+    })
+
+    action_descriptions = {
+        "write_file":      f"Done. Written to {tool_input.get('path', 'file')}.",
+        "gmail_send":      f"Email sent to {tool_input.get('to', '')}.",
+        "calendar_create": f"Event '{tool_input.get('summary', '')}' created.",
+        "calendar_delete": "Event deleted successfully."
+    }
+    friday_reply = action_descriptions.get(tool_name, "Done.")
+
+    conversation_history.append({"role": "user", "content": f"Action completed: {result}"})
+    conversation_history.append({"role": "assistant", "content": friday_reply})
+    return {"status": "confirmed", "reply": friday_reply}
+
+
+@app.get("/briefing")
+async def get_briefing():
+    try:
+        briefing = get_briefing_if_due()
+        if briefing:
+            return {"briefing": briefing, "has_briefing": True}
+        return {"briefing": "", "has_briefing": False}
+    except Exception as e:
+        return {"briefing": "", "has_briefing": False, "error": str(e)}
+
+
+@app.get("/notifications")
+async def get_notifs():
+    return {"notifications": get_notifications()}
+
+
+@app.delete("/notifications")
+async def clear_notifs():
+    clear_notifications()
+    return {"status": "cleared"}
+
+
+@app.post("/dnd/{state}")
+async def set_dnd_mode(state: str):
+    from scheduler import release_dnd_notifications
+    if state == "on":
+        set_dnd(True)
+        return {"status": "DND on"}
+    else:
+        set_dnd(False)
+        release_dnd_notifications()
+        return {"status": "DND off"}
+
 
 @app.get("/memories")
 async def get_memories():
@@ -343,8 +480,7 @@ async def get_memories():
         if count == 0:
             return {"memories": [], "count": 0}
         results = memory.collection.get()
-        memories = results.get("documents", [])
-        return {"memories": memories, "count": count}
+        return {"memories": results.get("documents", []), "count": count}
     except Exception as e:
         return {"memories": [], "count": 0, "error": str(e)}
 
