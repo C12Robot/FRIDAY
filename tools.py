@@ -3,6 +3,10 @@ from gmail import read_emails, send_email, search_emails
 from spotify import spotify_play, spotify_pause, spotify_next, spotify_current, spotify_play_playlist
 from automation import open_app, open_url, search_youtube, focus_mode_on, focus_mode_off, search_browser_history
 from finance import log_trade, get_market_prices, get_sentiment, get_weekly_pnl, get_trading_patterns
+from content import (search_trending, get_video_comments, get_channel_stats,
+                     get_best_upload_time, get_top_videos, generate_video_ideas,
+                     generate_script_outline, suggest_content_from_stats)
+from automation import set_brightness, set_volume, mute_volume, unmute_volume
 import requests
 import os
 
@@ -130,3 +134,39 @@ def finance_weekly_pnl():
 
 def finance_patterns():
     return get_trading_patterns()
+
+def content_trending(niche="futures trading finance"):
+    return search_trending(niche)
+
+def content_comments(video_url):
+    return get_video_comments(video_url)
+
+def content_channel_stats(channel="main"):
+    return get_channel_stats(channel)
+
+def content_upload_time(channel="main"):
+    return get_best_upload_time(channel)
+
+def content_top_videos(channel="main"):
+    return get_top_videos(channel)
+
+def content_video_ideas(niche="futures trading finance"):
+    return generate_video_ideas(niche)
+
+def content_script(topic):
+    return generate_script_outline(topic)
+
+def content_suggestions(channel="main"):
+    return suggest_content_from_stats(channel)
+
+def brightness_set(level):
+    return set_brightness(level)
+
+def volume_set(level):
+    return set_volume(level)
+
+def volume_mute():
+    return mute_volume()
+
+def volume_unmute():
+    return unmute_volume()

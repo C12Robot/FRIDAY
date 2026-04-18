@@ -3,6 +3,7 @@ import subprocess
 import webbrowser
 import sqlite3
 import shutil
+import ctypes
 from datetime import datetime, timedelta
 
 APPS = {
@@ -14,7 +15,8 @@ APPS = {
     "notepad": "notepad.exe",
     "explorer": "explorer.exe",
     "terminal": "powershell.exe",
-    "powershell": "powershell.exe"
+    "powershell": "powershell.exe",
+    "obsidian": r"C:\Program Files\Obsidian\Obsidian.exe",
 }
 
 
@@ -138,3 +140,52 @@ def search_browser_history(query, limit=5):
     except Exception as e:
         print(f"[HISTORY ERROR: {e}]")
         return f"History search error: {str(e)}"
+
+def set_brightness(level):
+    try:
+        level = max(0, min(100, int(level)))
+        import subprocess
+        subprocess.run(
+            f'powershell -Command "(Get-WmiObject -Namespace root/WMI -Class WmiMonitorBrightnessMethods).WmiSetBrightness(1,{level})"',
+            shell=True
+        )
+        return f"Brightness set to {level}%"
+    except Exception as e:
+        return f"Brightness error: {str(e)}"
+
+def set_volume(level):
+    try:
+        level = max(0, min(100, int(level)))
+        import subprocess
+        subprocess.run(
+            f'powershell -Command "$obj = New-Object -ComObject WScript.Shell; '
+            f'1..50 | ForEach-Object {{ $obj.SendKeys([char]174) }}; '
+            f'$steps = [math]::Round({level}/2); '
+            f'1..$steps | ForEach-Object {{ $obj.SendKeys([char]175) }}"',
+            shell=True
+        )
+        return f"Volume set to approximately {level}%"
+    except Exception as e:
+        return f"Volume error: {str(e)}"
+
+def mute_volume():
+    try:
+        import subprocess
+        subprocess.run(
+            'powershell -Command "$obj = New-Object -ComObject WScript.Shell; $obj.SendKeys([char]173)"',
+            shell=True
+        )
+        return "Muted."
+    except Exception as e:
+        return f"Mute error: {str(e)}"
+
+def unmute_volume():
+    try:
+        import subprocess
+        subprocess.run(
+            'powershell -Command "$obj = New-Object -ComObject WScript.Shell; $obj.SendKeys([char]173)"',
+            shell=True
+        )
+        return "Unmuted."
+    except Exception as e:
+        return f"Unmute error: {str(e)}"

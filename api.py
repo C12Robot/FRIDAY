@@ -21,7 +21,11 @@ from tools import (web_search, read_file, write_file, gmail_read, gmail_send, gm
                    spotify_play_list, spotify_control, open_application, open_website,
                    youtube_search, focus_on, focus_off, browser_history,
                    finance_log_trade, finance_market_prices, finance_sentiment,
-                   finance_weekly_pnl, finance_patterns)
+                   finance_weekly_pnl, finance_patterns,
+                   content_trending, content_comments, content_channel_stats,
+                   content_upload_time, content_top_videos, content_video_ideas,
+                   content_script, content_suggestions,
+                   brightness_set, volume_set, volume_mute, volume_unmute)
 from behaviour import log_interaction, get_behaviour_context
 from briefing import get_briefing_if_due, get_market_brief
 from scheduler import start_scheduler, get_notifications, clear_notifications, set_dnd
@@ -64,11 +68,7 @@ TOOL_DEFINITIONS = [
     {
         "name": "web_search",
         "description": "Search the internet for current information.",
-        "input_schema": {
-            "type": "object",
-            "properties": {"query": {"type": "string"}},
-            "required": ["query"]
-        }
+        "input_schema": {"type": "object", "properties": {"query": {"type": "string"}}, "required": ["query"]}
     },
     {
         "name": "gmail_read",
@@ -80,26 +80,18 @@ TOOL_DEFINITIONS = [
         "description": "Send an email. Always confirm before sending.",
         "input_schema": {
             "type": "object",
-            "properties": {
-                "to": {"type": "string"},
-                "subject": {"type": "string"},
-                "body": {"type": "string"}
-            },
+            "properties": {"to": {"type": "string"}, "subject": {"type": "string"}, "body": {"type": "string"}},
             "required": ["to", "subject", "body"]
         }
     },
     {
         "name": "gmail_search",
         "description": "Search emails.",
-        "input_schema": {
-            "type": "object",
-            "properties": {"query": {"type": "string"}},
-            "required": ["query"]
-        }
+        "input_schema": {"type": "object", "properties": {"query": {"type": "string"}}, "required": ["query"]}
     },
     {
         "name": "calendar_get",
-        "description": "Get upcoming calendar events. Returns events with their IDs.",
+        "description": "Get upcoming calendar events.",
         "input_schema": {"type": "object", "properties": {}, "required": []}
     },
     {
@@ -108,98 +100,60 @@ TOOL_DEFINITIONS = [
         "input_schema": {
             "type": "object",
             "properties": {
-                "summary": {"type": "string"},
-                "start_time": {"type": "string"},
-                "end_time": {"type": "string"},
-                "description": {"type": "string"},
-                "location": {"type": "string"}
+                "summary": {"type": "string"}, "start_time": {"type": "string"},
+                "end_time": {"type": "string"}, "description": {"type": "string"}, "location": {"type": "string"}
             },
             "required": ["summary", "start_time", "end_time"]
         }
     },
     {
         "name": "calendar_delete",
-        "description": "Delete a calendar event by its ID. Use calendar_get first to get the event ID.",
-        "input_schema": {
-            "type": "object",
-            "properties": {"event_id": {"type": "string"}},
-            "required": ["event_id"]
-        }
+        "description": "Delete a calendar event by ID.",
+        "input_schema": {"type": "object", "properties": {"event_id": {"type": "string"}}, "required": ["event_id"]}
     },
     {
         "name": "read_file",
         "description": "Read a file from the laptop.",
-        "input_schema": {
-            "type": "object",
-            "properties": {"path": {"type": "string"}},
-            "required": ["path"]
-        }
+        "input_schema": {"type": "object", "properties": {"path": {"type": "string"}}, "required": ["path"]}
     },
     {
         "name": "write_file",
         "description": "Write a file. For Obsidian logs use: C:\\Users\\meena\\Documents\\Builder_Brain\\FRIDAY'S LOGS\\Daily Log.md",
         "input_schema": {
             "type": "object",
-            "properties": {
-                "path": {"type": "string"},
-                "content": {"type": "string"}
-            },
+            "properties": {"path": {"type": "string"}, "content": {"type": "string"}},
             "required": ["path", "content"]
         }
     },
     {
         "name": "spotify_play_song",
         "description": "Play a song on Spotify.",
-        "input_schema": {
-            "type": "object",
-            "properties": {"query": {"type": "string"}},
-            "required": ["query"]
-        }
+        "input_schema": {"type": "object", "properties": {"query": {"type": "string"}}, "required": ["query"]}
     },
     {
         "name": "spotify_play_list",
         "description": "Play a playlist on Spotify.",
-        "input_schema": {
-            "type": "object",
-            "properties": {"name": {"type": "string"}},
-            "required": ["name"]
-        }
+        "input_schema": {"type": "object", "properties": {"name": {"type": "string"}}, "required": ["name"]}
     },
     {
         "name": "spotify_control",
         "description": "Control Spotify — pause, next, current.",
-        "input_schema": {
-            "type": "object",
-            "properties": {"action": {"type": "string"}},
-            "required": ["action"]
-        }
+        "input_schema": {"type": "object", "properties": {"action": {"type": "string"}}, "required": ["action"]}
     },
     {
         "name": "open_application",
-        "description": "Open an app on the laptop e.g. spotify, chrome, vs code.",
-        "input_schema": {
-            "type": "object",
-            "properties": {"app_name": {"type": "string"}},
-            "required": ["app_name"]
-        }
+        "description": "Open an app on the laptop e.g. spotify, chrome, vs code, obsidian.",
+        "input_schema": {"type": "object", "properties": {"app_name": {"type": "string"}}, "required": ["app_name"]}
     },
     {
         "name": "open_website",
         "description": "Open a website in the browser.",
-        "input_schema": {
-            "type": "object",
-            "properties": {"url": {"type": "string"}},
-            "required": ["url"]
-        }
+        "input_schema": {"type": "object", "properties": {"url": {"type": "string"}}, "required": ["url"]}
     },
     {
         "name": "youtube_search",
         "description": "Search YouTube and open in browser.",
-        "input_schema": {
-            "type": "object",
-            "properties": {"query": {"type": "string"}},
-            "required": ["query"]
-        }
+        "input_schema": {"type": "object", "properties": {"query": {"type": "string"}}, "required": ["query"]}
     },
     {
         "name": "focus_on",
@@ -213,26 +167,18 @@ TOOL_DEFINITIONS = [
     },
     {
         "name": "browser_history",
-        "description": "Search Chrome browser history. ALWAYS use when asked about visited sites or browser history.",
-        "input_schema": {
-            "type": "object",
-            "properties": {"query": {"type": "string"}},
-            "required": ["query"]
-        }
+        "description": "Search Chrome browser history.",
+        "input_schema": {"type": "object", "properties": {"query": {"type": "string"}}, "required": ["query"]}
     },
     {
         "name": "market_brief",
-        "description": "Get latest Gold price and MES1 Micro E-mini S&P 500 futures update.",
+        "description": "Get latest Gold price and MES1 futures update.",
         "input_schema": {"type": "object", "properties": {}, "required": []}
     },
     {
         "name": "finance_log_trade",
-        "description": "Log a trade to the trading journal in Obsidian. Use when user mentions buying, selling, entering or exiting a trade.",
-        "input_schema": {
-            "type": "object",
-            "properties": {"entry_text": {"type": "string", "description": "Trade details as described by user"}},
-            "required": ["entry_text"]
-        }
+        "description": "Log a trade to the trading journal. Use when user mentions buying, selling, entering or exiting a trade.",
+        "input_schema": {"type": "object", "properties": {"entry_text": {"type": "string"}}, "required": ["entry_text"]}
     },
     {
         "name": "finance_market_prices",
@@ -241,21 +187,77 @@ TOOL_DEFINITIONS = [
     },
     {
         "name": "finance_sentiment",
-        "description": "Get news sentiment analysis for a specific asset.",
-        "input_schema": {
-            "type": "object",
-            "properties": {"asset": {"type": "string", "description": "Asset name e.g. MES1, MGCJ25, Gold"}},
-            "required": ["asset"]
-        }
+        "description": "Get news sentiment for an asset.",
+        "input_schema": {"type": "object", "properties": {"asset": {"type": "string"}}, "required": ["asset"]}
     },
     {
         "name": "finance_weekly_pnl",
-        "description": "Get weekly P&L summary from the trading journal.",
+        "description": "Get monthly P&L summary from trading journal.",
         "input_schema": {"type": "object", "properties": {}, "required": []}
     },
     {
         "name": "finance_patterns",
-        "description": "Analyse trading patterns from the journal.",
+        "description": "Analyse trading patterns from journal.",
+        "input_schema": {"type": "object", "properties": {}, "required": []}
+    },
+    {
+        "name": "content_trending",
+        "description": "Search trending YouTube videos in finance/futures niche.",
+        "input_schema": {"type": "object", "properties": {"niche": {"type": "string"}}, "required": []}
+    },
+    {
+        "name": "content_comments",
+        "description": "Summarise comments from a YouTube video URL.",
+        "input_schema": {"type": "object", "properties": {"video_url": {"type": "string"}}, "required": ["video_url"]}
+    },
+    {
+        "name": "content_channel_stats",
+        "description": "Get YouTube channel stats for main or second channel.",
+        "input_schema": {"type": "object", "properties": {"channel": {"type": "string", "description": "main or second"}}, "required": []}
+    },
+    {
+        "name": "content_upload_time",
+        "description": "Get best upload time based on channel analytics.",
+        "input_schema": {"type": "object", "properties": {"channel": {"type": "string"}}, "required": []}
+    },
+    {
+        "name": "content_top_videos",
+        "description": "Get top performing videos from a channel.",
+        "input_schema": {"type": "object", "properties": {"channel": {"type": "string"}}, "required": []}
+    },
+    {
+        "name": "content_video_ideas",
+        "description": "Generate YouTube video ideas for finance/futures niche.",
+        "input_schema": {"type": "object", "properties": {"niche": {"type": "string"}}, "required": []}
+    },
+    {
+        "name": "content_script",
+        "description": "Generate a YouTube script outline for a given topic.",
+        "input_schema": {"type": "object", "properties": {"topic": {"type": "string"}}, "required": ["topic"]}
+    },
+    {
+        "name": "content_suggestions",
+        "description": "Get content suggestions based on channel stats.",
+        "input_schema": {"type": "object", "properties": {"channel": {"type": "string"}}, "required": []}
+    },
+    {
+        "name": "brightness_set",
+        "description": "Set screen brightness level 0-100.",
+        "input_schema": {"type": "object", "properties": {"level": {"type": "integer"}}, "required": ["level"]}
+    },
+    {
+        "name": "volume_set",
+        "description": "Set system volume level 0-100.",
+        "input_schema": {"type": "object", "properties": {"level": {"type": "integer"}}, "required": ["level"]}
+    },
+    {
+        "name": "volume_mute",
+        "description": "Mute system volume.",
+        "input_schema": {"type": "object", "properties": {}, "required": []}
+    },
+    {
+        "name": "volume_unmute",
+        "description": "Unmute system volume.",
         "input_schema": {"type": "object", "properties": {}, "required": []}
     }
 ]
@@ -274,46 +276,38 @@ Present information directly and concisely."""
 
 
 def execute_tool_direct(tool_name, tool_input):
-    if tool_name == "web_search":
-        return web_search(tool_input["query"])
-    elif tool_name == "read_file":
-        return read_file(tool_input["path"])
-    elif tool_name == "gmail_read":
-        return gmail_read()
-    elif tool_name == "gmail_search":
-        return gmail_search(tool_input["query"])
-    elif tool_name == "calendar_get":
-        return calendar_get()
-    elif tool_name == "spotify_play_song":
-        return spotify_play_song(tool_input["query"])
-    elif tool_name == "spotify_play_list":
-        return spotify_play_list(tool_input["name"])
-    elif tool_name == "spotify_control":
-        return spotify_control(tool_input["action"])
-    elif tool_name == "open_application":
-        return open_application(tool_input["app_name"])
-    elif tool_name == "open_website":
-        return open_website(tool_input["url"])
-    elif tool_name == "youtube_search":
-        return youtube_search(tool_input["query"])
-    elif tool_name == "focus_on":
-        return focus_on()
-    elif tool_name == "focus_off":
-        return focus_off()
-    elif tool_name == "browser_history":
-        return browser_history(tool_input["query"])
-    elif tool_name == "market_brief":
-        return get_market_brief()
-    elif tool_name == "finance_market_prices":
-        return finance_market_prices()
-    elif tool_name == "finance_sentiment":
-        return finance_sentiment(tool_input["asset"])
-    elif tool_name == "finance_weekly_pnl":
-        return finance_weekly_pnl()
-    elif tool_name == "finance_patterns":
-        return finance_patterns()
-    else:
-        return f"Unknown tool: {tool_name}"
+    if tool_name == "web_search":               return web_search(tool_input["query"])
+    elif tool_name == "read_file":              return read_file(tool_input["path"])
+    elif tool_name == "gmail_read":             return gmail_read()
+    elif tool_name == "gmail_search":           return gmail_search(tool_input["query"])
+    elif tool_name == "calendar_get":           return calendar_get()
+    elif tool_name == "spotify_play_song":      return spotify_play_song(tool_input["query"])
+    elif tool_name == "spotify_play_list":      return spotify_play_list(tool_input["name"])
+    elif tool_name == "spotify_control":        return spotify_control(tool_input["action"])
+    elif tool_name == "open_application":       return open_application(tool_input["app_name"])
+    elif tool_name == "open_website":           return open_website(tool_input["url"])
+    elif tool_name == "youtube_search":         return youtube_search(tool_input["query"])
+    elif tool_name == "focus_on":               return focus_on()
+    elif tool_name == "focus_off":              return focus_off()
+    elif tool_name == "browser_history":        return browser_history(tool_input["query"])
+    elif tool_name == "market_brief":           return get_market_brief()
+    elif tool_name == "finance_market_prices":  return finance_market_prices()
+    elif tool_name == "finance_sentiment":      return finance_sentiment(tool_input["asset"])
+    elif tool_name == "finance_weekly_pnl":     return finance_weekly_pnl()
+    elif tool_name == "finance_patterns":       return finance_patterns()
+    elif tool_name == "content_trending":       return content_trending(tool_input.get("niche", "futures trading finance"))
+    elif tool_name == "content_comments":       return content_comments(tool_input["video_url"])
+    elif tool_name == "content_channel_stats":  return content_channel_stats(tool_input.get("channel", "main"))
+    elif tool_name == "content_upload_time":    return content_upload_time(tool_input.get("channel", "main"))
+    elif tool_name == "content_top_videos":     return content_top_videos(tool_input.get("channel", "main"))
+    elif tool_name == "content_video_ideas":    return content_video_ideas(tool_input.get("niche", "futures trading finance"))
+    elif tool_name == "content_script":         return content_script(tool_input["topic"])
+    elif tool_name == "content_suggestions":    return content_suggestions(tool_input.get("channel", "main"))
+    elif tool_name == "brightness_set":         return brightness_set(tool_input["level"])
+    elif tool_name == "volume_set":             return volume_set(tool_input["level"])
+    elif tool_name == "volume_mute":            return volume_mute()
+    elif tool_name == "volume_unmute":          return volume_unmute()
+    else:                                       return f"Unknown tool: {tool_name}"
 
 
 def execute_tool_confirmed(tool_name, tool_input):
@@ -331,11 +325,8 @@ def execute_tool_confirmed(tool_name, tool_input):
         return gmail_send(tool_input["to"], tool_input["subject"], tool_input["body"])
     elif tool_name == "calendar_create":
         return calendar_create(
-            tool_input["summary"],
-            tool_input["start_time"],
-            tool_input["end_time"],
-            tool_input.get("description", ""),
-            tool_input.get("location", "")
+            tool_input["summary"], tool_input["start_time"], tool_input["end_time"],
+            tool_input.get("description", ""), tool_input.get("location", "")
         )
     elif tool_name == "calendar_delete":
         return calendar_delete(tool_input["event_id"])
@@ -382,9 +373,7 @@ async def chat(request: MessageRequest):
                 if tool_name in NEEDS_CONFIRMATION:
                     conf_id = str(uuid.uuid4())[:8]
                     pending_confirmation[conf_id] = {
-                        "tool_name":   tool_name,
-                        "tool_input":  tool_input,
-                        "tool_use_id": block.id
+                        "tool_name": tool_name, "tool_input": tool_input, "tool_use_id": block.id
                     }
                     if tool_name == "write_file":
                         details = f"Write to:\n{tool_input['path']}\n\nPreview:\n{tool_input['content'][:300]}"
@@ -408,15 +397,11 @@ async def chat(request: MessageRequest):
 
                 action_log.append({
                     "timestamp": datetime.now().strftime("%H:%M:%S"),
-                    "tool":      tool_name,
-                    "input":     str(tool_input),
-                    "result":    str(tool_result)[:200]
+                    "tool": tool_name, "input": str(tool_input), "result": str(tool_result)[:200]
                 })
 
                 tool_results.append({
-                    "type":        "tool_result",
-                    "tool_use_id": block.id,
-                    "content":     str(tool_result)
+                    "type": "tool_result", "tool_use_id": block.id, "content": str(tool_result)
                 })
 
             if conf_needed:
@@ -424,10 +409,8 @@ async def chat(request: MessageRequest):
                 conf_id, details = conf_needed
                 return MessageResponse(
                     reply="I need your confirmation before proceeding.",
-                    tools_used=tools_used,
-                    needs_confirmation=True,
-                    confirmation_id=conf_id,
-                    confirmation_details=details
+                    tools_used=tools_used, needs_confirmation=True,
+                    confirmation_id=conf_id, confirmation_details=details
                 )
 
             if tool_results:
@@ -455,8 +438,8 @@ async def confirm_action(request: ConfirmRequest):
     if conf_id not in pending_confirmation:
         return {"status": "error", "message": "Confirmation ID not found"}
 
-    pending    = pending_confirmation.pop(conf_id)
-    tool_name  = pending["tool_name"]
+    pending   = pending_confirmation.pop(conf_id)
+    tool_name = pending["tool_name"]
     tool_input = pending["tool_input"]
 
     if not request.confirmed:
@@ -471,9 +454,7 @@ async def confirm_action(request: ConfirmRequest):
 
     action_log.append({
         "timestamp": datetime.now().strftime("%H:%M:%S"),
-        "tool":      tool_name,
-        "input":     str(tool_input),
-        "result":    str(result)[:200]
+        "tool": tool_name, "input": str(tool_input), "result": str(result)[:200]
     })
 
     action_descriptions = {

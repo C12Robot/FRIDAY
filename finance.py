@@ -10,7 +10,35 @@ load_dotenv()
 client = Anthropic()
 
 OBSIDIAN_TRADING = r"C:\Users\meena\Documents\Builder_Brain\Trading Journal"
-WATCHLIST = ["MES1", "MGCJ25", "Gold"]
+POLYGON_KEY = os.getenv("POLYGON_API_KEY")
+
+TICKER_MAP = {
+    "MES1":   "MES",
+    "MGCJ25": "MGC",
+    "Gold":   "GC",
+    "gold":   "GC"
+}
+
+
+def _get_polygon_price(symbol):
+    try:
+        # try last trade first
+        url = f"https://api.polygon.io/v2/last/trade/{symbol}"
+        r = requests.get(url, params={"apiKey": POLYGON_KEY}, timeout=5)
+        data = r.json()
+        if data.get("status") == "OK" and data.get("results"):
+            price = data["results"]["p"]
+            return f"${price:,.2f}"
+        # fallback to previous close
+        url2 = f"https://api.polygon.io/v2/aggs/ticker/{symbol}/prev"
+        r2 = requests.get(url2, params={"apiKey": POLYGON_KEY}, timeout=5)
+        data2 = r2.json()
+        if data2.get("resultsCount", 0) > 0:
+            price = data2["results"][0]["c"]
+            return f"${price:,.2f} (prev close)"
+        return "unavailable"
+    except Exception as e:
+        return f"unavailable"
 
 
 def _tavily_search(query):
@@ -70,7 +98,7 @@ def log_trade(entry_text):
         f"- **Target:** {trade.get('target', 'N/A')}",
         f"- **R:R:** {rr if rr else 'N/A'}",
         f"- **Notes:** {trade.get('notes', '')}",
-        f"- **Result:** Pending",
+        "- **Result:** Pending",
         ""
     ]
     entry_md = "\n".join(lines)
@@ -83,24 +111,17 @@ def log_trade(entry_text):
 
 
 def get_market_prices():
-    results = {}
-    for asset in WATCHLIST:
-        data = _tavily_search(f"{asset} price today futures")
-        results[asset] = data[:150]
+    prices = {}
+    prices["MES1"]   = _get_polygon_price("MES")
+    prices["MGCJ25"] = _get_polygon_price("MGC")
+    prices["Gold"]   = _get_polygon_price("GC")
 
-    prompt = (
-        "Give a 3-line price update. Be direct, numbers only where possible.\n"
-        f"MES1: {results['MES1']}\n"
-        f"MGCJ25: {results['MGCJ25']}\n"
-        f"Gold: {results['Gold']}"
+    result = (
+        f"MES1 (Micro E-mini S&P): {prices['MES1']}\n"
+        f"MGCJ25 (Micro Gold): {prices['MGCJ25']}\n"
+        f"Gold (GC): {prices['Gold']}"
     )
-
-    response = client.messages.create(
-        model="claude-sonnet-4-5",
-        max_tokens=150,
-        messages=[{"role": "user", "content": prompt}]
-    )
-    return response.content[0].text.strip()
+    return result
 
 
 def get_sentiment(asset):
