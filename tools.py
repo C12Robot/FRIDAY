@@ -7,6 +7,9 @@ from content import (search_trending, get_video_comments, get_channel_stats,
                      get_best_upload_time, get_top_videos, generate_video_ideas,
                      generate_script_outline, suggest_content_from_stats)
 from automation import set_brightness, set_volume, mute_volume, unmute_volume
+from college import (read_any_file, summarise_file, summarise_text,
+                     generate_quiz, add_assignment, get_assignments,
+                     mark_assignment_done, find_research_papers, explain_concept)
 import requests
 import os
 
@@ -170,3 +173,27 @@ def volume_mute():
 
 def volume_unmute():
     return unmute_volume()
+
+def college_summarise_file(filepath):
+    return summarise_file(filepath)
+
+def college_summarise_text(text):
+    return summarise_text(text)
+
+def college_quiz(filepath=None, text=None, num_questions=5):
+    return generate_quiz(filepath, text, num_questions)
+
+def college_add_assignment(title, due_date, subject=""):
+    return add_assignment(title, due_date, subject)
+
+def college_get_assignments():
+    return get_assignments()
+
+def college_mark_done(title):
+    return mark_assignment_done(title)
+
+def college_find_papers(topic):
+    return find_research_papers(topic)
+
+def college_explain(concept, level="normal"):
+    return explain_concept(concept, level)

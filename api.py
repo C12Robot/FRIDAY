@@ -2,6 +2,8 @@ import warnings
 import logging
 import os
 import uuid
+import base64
+import tempfile
 
 warnings.filterwarnings("ignore")
 logging.getLogger("faster_whisper").setLevel(logging.ERROR)
@@ -9,7 +11,7 @@ logging.getLogger("sentence_transformers").setLevel(logging.ERROR)
 logging.getLogger("chromadb").setLevel(logging.ERROR)
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
-from fastapi import FastAPI
+from fastapi import FastAPI, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from datetime import datetime
@@ -25,10 +27,14 @@ from tools import (web_search, read_file, write_file, gmail_read, gmail_send, gm
                    content_trending, content_comments, content_channel_stats,
                    content_upload_time, content_top_videos, content_video_ideas,
                    content_script, content_suggestions,
-                   brightness_set, volume_set, volume_mute, volume_unmute)
+                   brightness_set, volume_set, volume_mute, volume_unmute,
+                   college_summarise_file, college_summarise_text, college_quiz,
+                   college_add_assignment, college_get_assignments, college_mark_done,
+                   college_find_papers, college_explain)
 from behaviour import log_interaction, get_behaviour_context
 from briefing import get_briefing_if_due, get_market_brief
 from scheduler import start_scheduler, get_notifications, clear_notifications, set_dnd
+from college import read_any_file
 
 load_dotenv()
 
@@ -49,6 +55,7 @@ scheduler = start_scheduler()
 conversation_history = []
 action_log = []
 pending_confirmation = {}
+uploaded_file_context = {}
 
 class MessageRequest(BaseModel):
     message: str
@@ -177,7 +184,7 @@ TOOL_DEFINITIONS = [
     },
     {
         "name": "finance_log_trade",
-        "description": "Log a trade to the trading journal. Use when user mentions buying, selling, entering or exiting a trade.",
+        "description": "Log a trade to the trading journal.",
         "input_schema": {"type": "object", "properties": {"entry_text": {"type": "string"}}, "required": ["entry_text"]}
     },
     {
@@ -213,7 +220,7 @@ TOOL_DEFINITIONS = [
     {
         "name": "content_channel_stats",
         "description": "Get YouTube channel stats for main or second channel.",
-        "input_schema": {"type": "object", "properties": {"channel": {"type": "string", "description": "main or second"}}, "required": []}
+        "input_schema": {"type": "object", "properties": {"channel": {"type": "string"}}, "required": []}
     },
     {
         "name": "content_upload_time",
@@ -227,12 +234,12 @@ TOOL_DEFINITIONS = [
     },
     {
         "name": "content_video_ideas",
-        "description": "Generate YouTube video ideas for finance/futures niche.",
+        "description": "Generate YouTube video ideas.",
         "input_schema": {"type": "object", "properties": {"niche": {"type": "string"}}, "required": []}
     },
     {
         "name": "content_script",
-        "description": "Generate a YouTube script outline for a given topic.",
+        "description": "Generate a YouTube script outline for a topic.",
         "input_schema": {"type": "object", "properties": {"topic": {"type": "string"}}, "required": ["topic"]}
     },
     {
@@ -242,12 +249,12 @@ TOOL_DEFINITIONS = [
     },
     {
         "name": "brightness_set",
-        "description": "Set screen brightness level 0-100.",
+        "description": "Set screen brightness 0-100.",
         "input_schema": {"type": "object", "properties": {"level": {"type": "integer"}}, "required": ["level"]}
     },
     {
         "name": "volume_set",
-        "description": "Set system volume level 0-100.",
+        "description": "Set system volume 0-100.",
         "input_schema": {"type": "object", "properties": {"level": {"type": "integer"}}, "required": ["level"]}
     },
     {
@@ -259,6 +266,77 @@ TOOL_DEFINITIONS = [
         "name": "volume_unmute",
         "description": "Unmute system volume.",
         "input_schema": {"type": "object", "properties": {}, "required": []}
+    },
+    {
+        "name": "college_summarise_file",
+        "description": "Summarise a document file (PDF, docx, txt, image) from a file path.",
+        "input_schema": {"type": "object", "properties": {"filepath": {"type": "string"}}, "required": ["filepath"]}
+    },
+    {
+        "name": "college_summarise_uploaded",
+        "description": "Summarise the most recently uploaded file.",
+        "input_schema": {"type": "object", "properties": {}, "required": []}
+    },
+    {
+        "name": "college_quiz",
+        "description": "Generate quiz questions from uploaded file or file path.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "filepath": {"type": "string"},
+                "num_questions": {"type": "integer"}
+            },
+            "required": []
+        }
+    },
+    {
+        "name": "college_quiz_uploaded",
+        "description": "Generate quiz from the most recently uploaded file.",
+        "input_schema": {
+            "type": "object",
+            "properties": {"num_questions": {"type": "integer"}},
+            "required": []
+        }
+    },
+    {
+        "name": "college_add_assignment",
+        "description": "Add an assignment to the tracker.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "title": {"type": "string"},
+                "due_date": {"type": "string"},
+                "subject": {"type": "string"}
+            },
+            "required": ["title", "due_date"]
+        }
+    },
+    {
+        "name": "college_get_assignments",
+        "description": "Get all pending assignments.",
+        "input_schema": {"type": "object", "properties": {}, "required": []}
+    },
+    {
+        "name": "college_mark_done",
+        "description": "Mark an assignment as done.",
+        "input_schema": {"type": "object", "properties": {"title": {"type": "string"}}, "required": ["title"]}
+    },
+    {
+        "name": "college_find_papers",
+        "description": "Find research papers on a topic.",
+        "input_schema": {"type": "object", "properties": {"topic": {"type": "string"}}, "required": ["topic"]}
+    },
+    {
+        "name": "college_explain",
+        "description": "Explain a concept. Level: simple, normal, or deep.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "concept": {"type": "string"},
+                "level": {"type": "string", "description": "simple, normal, or deep"}
+            },
+            "required": ["concept"]
+        }
     }
 ]
 
@@ -272,6 +350,7 @@ Today's date is {datetime.now().strftime('%A, %B %d %Y')}.
 You are helpful, concise, and professional.
 You remember everything said in this conversation.
 IMPORTANT: When writing logs to Obsidian always use EXACTLY: C:\\Users\\meena\\Documents\\Builder_Brain\\FRIDAY'S LOGS\\Daily Log.md
+If a file was recently uploaded, use college_summarise_uploaded or college_quiz_uploaded tools.
 Present information directly and concisely."""
 
 
@@ -307,6 +386,23 @@ def execute_tool_direct(tool_name, tool_input):
     elif tool_name == "volume_set":             return volume_set(tool_input["level"])
     elif tool_name == "volume_mute":            return volume_mute()
     elif tool_name == "volume_unmute":          return volume_unmute()
+    elif tool_name == "college_summarise_file": return college_summarise_file(tool_input["filepath"])
+    elif tool_name == "college_summarise_uploaded":
+        ctx = uploaded_file_context.get("last")
+        if not ctx:
+            return "No file uploaded yet."
+        return college_summarise_text(ctx["content"])
+    elif tool_name == "college_quiz":           return college_quiz(filepath=tool_input.get("filepath"), num_questions=tool_input.get("num_questions", 5))
+    elif tool_name == "college_quiz_uploaded":
+        ctx = uploaded_file_context.get("last")
+        if not ctx:
+            return "No file uploaded yet."
+        return college_quiz(text=ctx["content"], num_questions=tool_input.get("num_questions", 5))
+    elif tool_name == "college_add_assignment": return college_add_assignment(tool_input["title"], tool_input["due_date"], tool_input.get("subject", ""))
+    elif tool_name == "college_get_assignments":return college_get_assignments()
+    elif tool_name == "college_mark_done":      return college_mark_done(tool_input["title"])
+    elif tool_name == "college_find_papers":    return college_find_papers(tool_input["topic"])
+    elif tool_name == "college_explain":        return college_explain(tool_input["concept"], tool_input.get("level", "normal"))
     else:                                       return f"Unknown tool: {tool_name}"
 
 
@@ -335,6 +431,37 @@ def execute_tool_confirmed(tool_name, tool_input):
     return "Action completed."
 
 
+@app.post("/upload")
+async def upload_file(file: UploadFile = File(...)):
+    try:
+        contents  = await file.read()
+        ext       = os.path.splitext(file.filename)[1].lower()
+        tmp_path  = os.path.join(tempfile.gettempdir(), f"friday_upload{ext}")
+
+        with open(tmp_path, "wb") as f:
+            f.write(contents)
+
+        content = read_any_file(tmp_path)
+        uploaded_file_context["last"] = {
+            "filename": file.filename,
+            "content":  content,
+            "path":     tmp_path
+        }
+
+        conversation_history.append({
+            "role": "user",
+            "content": f"[File uploaded: {file.filename}] Content preview: {content[:500]}..."
+        })
+
+        return {
+            "status":   "success",
+            "filename": file.filename,
+            "preview":  content[:300]
+        }
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+
 @app.post("/chat")
 async def chat(request: MessageRequest):
     user_message = request.message
@@ -344,6 +471,9 @@ async def chat(request: MessageRequest):
     full_system_prompt = BASE_SYSTEM_PROMPT + get_behaviour_context()
     if memory_context:
         full_system_prompt += f"\n{memory_context}"
+
+    if uploaded_file_context.get("last"):
+        full_system_prompt += f"\nA file was recently uploaded: {uploaded_file_context['last']['filename']}. Use college_summarise_uploaded or college_quiz_uploaded if the user asks about it."
 
     conversation_history.append({"role": "user", "content": user_message})
 
@@ -384,7 +514,7 @@ async def chat(request: MessageRequest):
                     elif tool_name == "calendar_delete":
                         details = f"Delete calendar event\nEvent ID: {tool_input['event_id']}"
                     elif tool_name == "finance_log_trade":
-                        details = f"Log trade to Trading Journal:\n{tool_input['entry_text']}"
+                        details = f"Log trade:\n{tool_input['entry_text']}"
                     else:
                         details = str(tool_input)
                     conf_needed = (conf_id, details)
@@ -438,8 +568,8 @@ async def confirm_action(request: ConfirmRequest):
     if conf_id not in pending_confirmation:
         return {"status": "error", "message": "Confirmation ID not found"}
 
-    pending   = pending_confirmation.pop(conf_id)
-    tool_name = pending["tool_name"]
+    pending    = pending_confirmation.pop(conf_id)
+    tool_name  = pending["tool_name"]
     tool_input = pending["tool_input"]
 
     if not request.confirmed:
