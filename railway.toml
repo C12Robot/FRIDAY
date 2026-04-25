@@ -1,5 +1,3 @@
 [deploy]
 startCommand = "uvicorn api:app --host 0.0.0.0 --port $PORT"
 
-[build]
-railpackInstallCmd = "pip install -r requirements_cloud.txt"
