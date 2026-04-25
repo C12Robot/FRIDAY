@@ -10,6 +10,10 @@ from automation import set_brightness, set_volume, mute_volume, unmute_volume
 from college import (read_any_file, summarise_file, summarise_text,
                      generate_quiz, add_assignment, get_assignments,
                      mark_assignment_done, find_research_papers, explain_concept)
+from productivity import (review_code, review_uploaded_code, draft_email,
+                          log_habit, get_habit_summary, clipboard_save,
+                          clipboard_search, clipboard_list,
+                          log_expense, get_spending_summary)
 import requests
 import os
 
@@ -197,3 +201,37 @@ def college_find_papers(topic):
 
 def college_explain(concept, level="normal"):
     return explain_concept(concept, level)
+
+def prod_review_code(code, language=""):
+    return review_code(code, language)
+
+def prod_review_uploaded():
+    from api import uploaded_file_context
+    ctx = uploaded_file_context.get("last")
+    if not ctx:
+        return "No file uploaded."
+    return review_uploaded_code(ctx["content"], ctx.get("filename", ""))
+
+def prod_draft_email(context, tone="professional"):
+    return draft_email(context, tone)
+
+def prod_log_habit(entry):
+    return log_habit(entry)
+
+def prod_habit_summary():
+    return get_habit_summary()
+
+def prod_clipboard_save(note):
+    return clipboard_save(note)
+
+def prod_clipboard_search(query):
+    return clipboard_search(query)
+
+def prod_clipboard_list():
+    return clipboard_list()
+
+def prod_log_expense(description, amount, currency="INR"):
+    return log_expense(description, amount, currency)
+
+def prod_spending_summary(period="today"):
+    return get_spending_summary(period)

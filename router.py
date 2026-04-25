@@ -20,7 +20,10 @@ COMPLEX_KEYWORDS = [
     "look up", "what's happening", "news", "weather",
     "memory", "remember",
     "play", "spotify", "pause", "next song", "current song",
-    "open", "launch", "focus mode", "youtube", "history", "browser history", "visited", "search history"
+    "open", "launch", "focus mode", "youtube", "history", "browser history", "visited", "search history",
+    "log habit", "log mood", "log expense", "remember this",
+    "what did i save", "clipboard", "spending", "how much", "youtube", "channel", "analytics", "stats", "upload time",
+    "top videos", "video ideas", "script", "trending"
 ]
 
 FAST_KEYWORDS = [
