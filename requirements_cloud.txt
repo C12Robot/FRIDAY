@@ -16,4 +16,4 @@ pytesseract
 pillow
 requests
 python-multipart
-polygon-api-python-client
+polygon-api-client
