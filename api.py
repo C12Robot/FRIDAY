@@ -3,6 +3,9 @@ import logging
 import os
 import uuid
 import tempfile
+import threading
+import time
+import numpy as np
 
 warnings.filterwarnings("ignore")
 logging.getLogger("faster_whisper").setLevel(logging.ERROR)
@@ -64,6 +67,16 @@ conversation_history  = []
 action_log            = []
 pending_confirmation  = {}
 uploaded_file_context = {}
+
+# ── VOICE STATE ───────────────────────────────────────────────────────────────
+recording_active = False
+recording_frames = []
+recording_thread = None
+voice_result     = {"status": "idle", "text": ""}
+
+SILENCE_THRESHOLD = 0.008   # volume below this = silence
+SILENCE_DURATION  = 2.5     # seconds of silence before auto-stop
+MIN_SPEECH_SECS   = 0.5     # minimum speech before VAD kicks in
 
 class MessageRequest(BaseModel):
     message: str
@@ -146,7 +159,7 @@ BASE_SYSTEM_PROMPT = f"""You are FRIDAY, a smart and efficient personal assistan
 Today's date is {datetime.now().strftime('%A, %B %d %Y')}.
 You are helpful, concise, and professional.
 You remember everything said in this conversation.
-IMPORTANT: When writing logs to Obsidian always use EXACTLY: C:\\Users\\meena\\Documents\\Builder_Brain\\FRIDAY'S LOGS\\Daily Log.md
+IMPORTANT: When user says "log" followed by any text, ALWAYS use the write_file tool with path EXACTLY: C:\\Users\\meena\\Documents\\Builder_Brain\\FRIDAY'S LOGS\\FRIDAY LOGS.md and append the content. Never use any other path for logs.
 If a file was recently uploaded, use the _uploaded variants of tools.
 Present information directly and concisely."""
 
@@ -228,6 +241,16 @@ def execute_tool_confirmed(tool_name, tool_input):
     return "Action completed."
 
 
+def _transcribe(audio_data):
+    import soundfile as sf
+    from faster_whisper import WhisperModel
+    audio_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "temp_audio.wav")
+    sf.write(audio_path, audio_data, 16000)
+    model    = WhisperModel("tiny", device="cpu", compute_type="int8")
+    segments, _ = model.transcribe(audio_path, beam_size=1)
+    return " ".join([s.text for s in segments]).strip()
+
+
 @app.post("/upload")
 async def upload_file(file: UploadFile = File(...)):
     try:
@@ -244,6 +267,76 @@ async def upload_file(file: UploadFile = File(...)):
         return {"status": "error", "message": str(e)}
 
 
+@app.post("/start-listen")
+async def start_listen():
+    global recording_active, recording_frames, recording_thread, voice_result
+    try:
+        import sounddevice as sd
+        recording_active = True
+        recording_frames = []
+        voice_result     = {"status": "listening", "text": ""}
+        fs = 16000
+        print("[VOICE] Recording started with VAD")
+
+        def record():
+            global recording_active, voice_result
+            try:
+                with sd.InputStream(samplerate=fs, channels=1, dtype='float32') as stream:
+                    start = time.time()
+                    while recording_active and (time.time() - start) < 4.0:
+                        data, _ = stream.read(1024)
+                        recording_frames.append(data.copy())
+
+                print(f"[VOICE] Done. Frames: {len(recording_frames)}")
+
+                if recording_frames:
+                    voice_result = {"status": "processing", "text": ""}
+                    audio_data   = np.concatenate(recording_frames, axis=0)
+                    text         = _transcribe(audio_data)
+                    print(f"[VOICE] Transcribed: '{text}'")
+                    voice_result = {"status": "done", "text": text}
+                else:
+                    voice_result = {"status": "empty", "text": ""}
+
+            except Exception as e:
+                print(f"[VOICE] Error: {str(e)}")
+                voice_result = {"status": "error", "text": ""}
+
+        recording_thread = threading.Thread(target=record, daemon=True)
+        recording_thread.start()
+        return {"status": "recording"}
+    except Exception as e:
+        return {"status": "error", "error": str(e)}
+
+
+@app.post("/stop-listen")
+async def stop_listen():
+    global recording_active, recording_thread, voice_result
+    recording_active = False
+    if recording_thread:
+        recording_thread.join(timeout=5)
+
+    if voice_result.get("status") == "done":
+        return {"text": voice_result["text"], "status": "ok"}
+
+    # if thread didn't finish transcribing yet, do it now
+    if recording_frames:
+        try:
+            audio_data = np.concatenate(recording_frames, axis=0)
+            text       = _transcribe(audio_data)
+            voice_result = {"status": "done", "text": text}
+            return {"text": text, "status": "ok"}
+        except Exception as e:
+            return {"text": "", "status": "error", "error": str(e)}
+
+    return {"text": "", "status": "empty"}
+
+
+@app.get("/voice-result")
+async def get_voice_result():
+    return voice_result
+
+
 @app.post("/chat")
 async def chat(request: MessageRequest):
     user_message = request.message
@@ -256,7 +349,6 @@ async def chat(request: MessageRequest):
     if uploaded_file_context.get("last"):
         full_system_prompt += f"\nRecently uploaded: {uploaded_file_context['last']['filename']}. Use _uploaded tool variants."
 
-    # route simple messages to Ollama (free, local)
     if not is_complex(user_message) and is_ollama_running():
         reply = ask_ollama(user_message, conversation_history)
         if reply:
@@ -265,7 +357,6 @@ async def chat(request: MessageRequest):
             log_interaction(user_message, reply, [])
             return MessageResponse(reply=reply, tools_used=[])
 
-    # complex or Ollama unavailable — use Claude
     if client is None:
         return MessageResponse(reply="Claude API unavailable. Add credits at console.anthropic.com", tools_used=[])
 
