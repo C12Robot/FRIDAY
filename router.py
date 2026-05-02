@@ -3,9 +3,9 @@ import requests
 OLLAMA_URL = "http://localhost:11434/api/generate"
 
 MODELS = {
-    "code":    "qwen2.5-coder:7b",
-    "general": "qwen3:8b",
-    "fast":    "llama3.2:3b"
+    "code":    "deepseek-coder:6.7b",
+    "general": "qwen3.5:9b",
+    "fast":    "deepseek-r1:8b"
 }
 
 CODE_KEYWORDS = [

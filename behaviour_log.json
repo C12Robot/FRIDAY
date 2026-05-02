@@ -2827,5 +2827,84 @@
     "user": "is open code good for having as an open model to run locally",
     "reply": "**OpenCode** (if you're referring to open-source code models like **CodeLlama**, **StarCoder**, **WizardCoder**, or similar) can be excellent for running locally, depending on your needs. Here's a breakdown:\n\n### **Pros of Running Open Code Models Locally:**\n1. **Privacy** - Your code stays on your machine\n2. **No API costs** - Free after initial setup\n3. **Offline access** - Works without internet\n4. **Customization** - Fine-tune for your specific use cases\n\n### **Good Open-Source Code Models (2026):**\n- **CodeLlama** (7B-34B) - Meta's coding model, very capable\n- **StarCoder2** - Strong for multiple languages\n- **DeepSeek Coder** - Excellent performance, efficient\n- **WizardCoder** - Fine-tuned for coding tasks\n- **Mistral-Code** - Fast and efficient\n\n### **System Requirements:**\n- **7B models**: 8-16GB RAM (decent performance)\n- **13B models**: 16-32GB RAM (better quality)\n- **34B+ models**: 32GB+ RAM or GPU required\n\n### **Best Setup:**\n- Use **Ollama** or **LM Studio** for easy local deployment\n- GPU (NVIDIA) recommended for faster inference\n\nWould you like help setting up a specific model locally?",
     "tools": []
+  },
+  {
+    "timestamp": "2026-04-29T18:00:44.693670",
+    "hour": 18,
+    "user": "hi friday",
+    "reply": "Good morning! How can I assist you today?",
+    "tools": []
+  },
+  {
+    "timestamp": "2026-04-29T18:01:03.485523",
+    "hour": 18,
+    "user": "\u06cc\u06c1 \u0641\u06cc\u0688\u06af\u0646\u0648\u0679\u0644 \u0645\u06cc\u06d2 \u062c\u0648\u06a9",
+    "reply": "I apologize for not understanding your request earlier. It seems like you spoke in a language other than English. Could you please rephrase or type your question in English? I'll do my best to assist you.\n\nIf you need help with translation, I can try to translate it into English for you.",
+    "tools": []
+  },
+  {
+    "timestamp": "2026-04-29T18:01:20.808027",
+    "hour": 18,
+    "user": "Can you tell me a joke?",
+    "reply": "I'd be happy to share a joke with you!\n\nHere's one:\n\nWhy did the coffee file a police report?\n\n(Wait for it...)\n\nBecause it got mugged!\n\nHope that made your day a little brighter! Do you want to hear another one?",
+    "tools": []
+  },
+  {
+    "timestamp": "2026-04-30T03:08:56.928823",
+    "hour": 3,
+    "user": "\u00a1Pero me dedo!",
+    "reply": "Lo siento mucho! \u00bfEn qu\u00e9 puedo ayudarte hoy?",
+    "tools": []
+  },
+  {
+    "timestamp": "2026-04-30T03:09:11.090206",
+    "hour": 3,
+    "user": "If I had to get it, I'd be a joke.",
+    "reply": "Sounds like you're feeling a bit down. Would you like to talk about what's on your mind or would you rather I suggest some things to take your mind off it?",
+    "tools": []
+  },
+  {
+    "timestamp": "2026-04-30T03:09:54.061713",
+    "hour": 3,
+    "user": "Sounds like you're feeling a bit down.  What you like to do.",
+    "reply": "Lo siento que te sientas as\u00ed. Aunque no tengo preferencias personales, puedo sugerir actividades que a muchas personas les gustan, como escuchar m\u00fasica, leer, caminar o ver una pel\u00edcula. \u00bfTe gustar\u00eda que te recomiende algo? \ud83c\udf1f",
+    "tools": []
+  },
+  {
+    "timestamp": "2026-04-30T03:10:23.013310",
+    "hour": 3,
+    "user": "open obsidian",
+    "reply": "I couldn't generate a response.",
+    "tools": [
+      "open_application"
+    ]
+  },
+  {
+    "timestamp": "2026-05-02T15:43:23.948158",
+    "hour": 15,
+    "user": "good morning friday",
+    "reply": "Good morning! Ready to assist with anything you need today?",
+    "tools": []
+  },
+  {
+    "timestamp": "2026-05-02T15:43:54.209258",
+    "hour": 15,
+    "user": "do you remember our chat where we were brainstorming all new features that we can add into you?",
+    "reply": "Looking through my memories, I don't have a record of a specific brainstorming session where we discussed new features to add to me.\n\nI do see references to various features you've used - like logging habits, market updates, college tools, content creation features, and productivity functions - but not a dedicated conversation about brainstorming future additions.\n\nDid we have that conversation recently? If so, what features were we discussing? I'd like to remember them properly.",
+    "tools": []
+  },
+  {
+    "timestamp": "2026-05-02T15:44:31.246639",
+    "hour": 15,
+    "user": "so it was like local file management, you can track every file, open it, change it",
+    "reply": "Ah yes, that makes sense! A local file management system where I could:\n\n- **Track files** across your system (index them)\n- **Search and locate** files by name, type, or content\n- **Open files** directly without needing exact paths\n- **Modify/edit files** on command\n- **Monitor changes** to specific files or folders\n- **Organize** files (move, rename, delete)\n\nThis would be a huge upgrade from my current limitation where I need exact file paths. Right now I can only read/write when you give me the complete path - I can't browse directories or discover what files exist.\n\nWas this part of a bigger list of features we were planning? What else were we thinking about adding?",
+    "tools": []
+  },
+  {
+    "timestamp": "2026-05-02T15:45:54.346104",
+    "hour": 15,
+    "user": "what more can we add?",
+    "reply": "Here are some additional features we could add to make me even more powerful:\n\n**File & System Management:**\n- Screenshot capture and analysis\n- Clipboard monitoring (read what you copy in real-time)\n- Run terminal commands/scripts\n- Monitor specific folders for changes\n- Bulk file operations (rename multiple files, organize downloads)\n\n**Communication & Automation:**\n- Send messages via WhatsApp/Discord/Slack\n- Auto-respond to emails based on rules\n- Schedule delayed actions (\"remind me in 2 hours\")\n- Create automated workflows (if X happens, do Y)\n\n**Intelligence & Learning:**\n- Analyze your work patterns and suggest optimizations\n- Learn your preferences over time (favorite playlists, common searches)\n- Proactive suggestions (\"You usually check markets at this time\")\n- Context-aware interruptions (don't disturb during focus sessions)\n\n**Content & Trading:**\n- Auto-generate thumbnail ideas from video topics\n- Track competitor channels automatically\n- Real-time trade alerts based on your criteria\n- Backtest trading strategies\n\n**Health & Productivity:**\n- Pomodoro timer with automatic focus mode\n- Eye strain reminders (break notifications)\n- Sleep schedule tracking and bedtime reminders\n\nWhat sounds most useful to you right now?",
+    "tools": []
   }
 ]
