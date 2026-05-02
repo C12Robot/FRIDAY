@@ -36,11 +36,26 @@ focus_mode_active = False
 
 def open_app(app_name):
     try:
+        # First check known apps dict
         app = APPS.get(app_name.lower())
-        if not app:
-            return f"I don't know how to open '{app_name}'. Add it to the apps list."
-        os.startfile(app.replace('start /B "', '').replace('"', ''))
-        return f"Opening {app_name}."
+        if app:
+            subprocess.Popen([app])
+            return f"Opening {app_name}."
+
+        # If not in dict, search entire system for it
+        search_result = subprocess.run(
+            ['where', app_name],
+            capture_output=True, text=True
+        )
+        if search_result.returncode == 0:
+            path = search_result.stdout.strip().split('\n')[0]
+            subprocess.Popen([path])
+            return f"Opening {app_name}."
+
+        # Last resort — use Windows shell (like pressing Win+R)
+        subprocess.Popen(f'start "" "{app_name}"', shell=True)
+        return f"Attempting to open {app_name}."
+
     except Exception as e:
         return f"Error opening {app_name}: {str(e)}"
 

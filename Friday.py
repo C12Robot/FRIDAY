@@ -26,11 +26,15 @@ from behaviour import (log_interaction, get_behaviour_context,
                        is_weekly_summary_due, generate_weekly_summary,
                        write_weekly_summary)
 from router import is_complex, ask_ollama, is_ollama_running
+from file_manager import search_files, open_file, index_files, init_db
 
 load_dotenv()
 
 client = Anthropic()
 memory = FridayMemory()
+init_db()
+import threading
+threading.Thread(target=index_files, daemon=True).start()
 
 TOOL_DEFINITIONS = [
     {
@@ -201,8 +205,19 @@ TOOL_DEFINITIONS = [
             "query": {"type": "string", "description": "Keyword to search in browser history"}
         },
         "required": ["query"]
+    }},
+    {
+    "name": "search_and_open_file",
+    "description": "Search for a file on the laptop and open it",
+    "input_schema": {
+        "type": "object",
+        "properties": {
+            "query": {"type": "string", "description": "File name or description"}
+        },
+        "required": ["query"]
     }
-}
+    }
+
 ]
 
 BASE_SYSTEM_PROMPT = f"""You are FRIDAY, a smart and efficient personal assistant.
@@ -213,7 +228,7 @@ You remember everything said in this conversation.
 When you don't know something, use your tools to find out.
 Present information directly without preamble like 'Based on my search' or 'I found that'.
 Keep responses concise — you are speaking out loud, so avoid long lists or bullet points.
-Never ask the user for confirmation in chat. Just use the tool directly — the system will handle confirmations automatically via popup."""
+Never ask the user for confirmation in chat. Just use the tool directly — the system will handle confirmations automatically via popup. "When search_and_open_file returns a result, it has already opened the file. Just confirm to the user it's open."""
 
 conversation_history = []
 
@@ -262,6 +277,17 @@ def execute_tool(tool_name, tool_input):
     elif tool_name == "browser_history":
         result = browser_history(tool_input["query"])
         return result
+    elif tool_name == "search_and_open_file":
+        query = tool_input["query"]
+        results = search_files(query, limit=3)  
+        print(f"[DEBUG] Search results: {results}")
+        if results:
+            best = results[0]
+            clean_path = best["path"].replace("\\\\", "\\")
+            print(f"[DEBUG] Opening path: '{clean_path}'") 
+            result = open_file(clean_path)
+            print(f"[DEBUG] open_file result: {result}")
+            return f"Opened: {best['name']} at {best['path']}"
     else:
         return f"Unknown tool: {tool_name}"
 
@@ -417,7 +443,9 @@ while True:
         print("FRIDAY: Logged to Obsidian.\n")
         continue
 
-    if not is_complex(user_input) and is_ollama_running():
+    FILE_KEYWORDS = ["open", "file", "find", "search", "folder", "document", "cheatsheet", "notes", "pdf", "obsidian", "show", "locate"]
+
+    if not is_complex(user_input) and is_ollama_running() and not any(k in user_lower for k in FILE_KEYWORDS):
         response = ask_ollama(user_input, conversation_history)
         if response:
             print(f"\nFRIDAY (local): {response}\n")
