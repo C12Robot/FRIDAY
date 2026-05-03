@@ -129,11 +129,14 @@ python friday.py
 ### Dashboard Mode
 ```powershell
 # Terminal 1 — API backend
+cd ARIA
+venv\Script\activate.ps1
 uvicorn api:app --reload --port 8000
 
 # Terminal 2 — React frontend
 cd friday-dashboard
 npm start
+.\node_modules\.bin\electron.cmd electron.js
 ```
 
 ---
@@ -145,10 +148,10 @@ npm start
 3. Install dependencies: `pip install anthropic python-dotenv chromadb sentence-transformers requests faster-whisper edge-tts sounddevice scipy numpy google-auth google-auth-oauthlib google-api-python-client pyautogui fastapi uvicorn`
 4. Add your API keys to a `.env` file:
 ```
-ANTHROPIC_API_KEY=your_key
-TAVILY_API_KEY=your_key
-SPOTIFY_CLIENT_ID=your_key
-SPOTIFY_CLIENT_SECRET=your_key
+ANTHROPIC_API_KEY= Anthropic_key
+TAVILY_API_KEY= Tavily_Key
+SPOTIFY_CLIENT_ID= Spotify_Key
+SPOTIFY_CLIENT_SECRET= Spotify Client Key
 ```
 5. Run `python friday.py`
 
@@ -165,7 +168,7 @@ ARIA/
   tools.py           ← web search, file read/write, automation
   voice.py           ← voice interface
   api.py             ← FastAPI backend
-  .env               ← API keys (never share or upload)
+  .env               ← API keys ((Confidential)
   .gitignore
   friday_memory/     ← ChromaDB stores data here
   friday-dashboard/  ← React frontend
