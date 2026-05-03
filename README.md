@@ -107,6 +107,16 @@ FRIDAY never acts without permission. Three layers of control:
 
 ---
 
+## Screenshots
+
+### HAL 9000 Interface — Morning Brief
+![FRIDAY Desktop UI](https://github.com/C12Robot/FRIDAY/raw/master/assets/Desktop%20FRIDAY%20UI.png)
+
+### Dashboard — Memory Panel + Action Log
+![FRIDAY Memory Tab](https://github.com/C12Robot/FRIDAY/raw/master/assets/FRIDAY%20Memory%20Tab.png)
+
+---
+
 ## How to Run
 
 ### Terminal Mode
