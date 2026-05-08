@@ -29,6 +29,8 @@ from router import is_complex, ask_ollama, is_ollama_running
 from file_manager import search_files, open_file, index_files, init_db
 
 load_dotenv()
+if not os.getenv("ANTHROPIC_API_KEY"):
+    raise ValueError("ANTHROPIC_API_KEY not set in .env")
 
 client = Anthropic()
 memory = FridayMemory()
@@ -303,7 +305,7 @@ def chat(user_message):
 
     while True:
         response = client.messages.create(
-            model="claude-sonnet-4-5",
+            model=os.getenv("ANTHROPIC_MODEL", "claude-sonnet-4-6"),
             max_tokens=1024,
             system=full_system_prompt,
             tools=TOOL_DEFINITIONS,

@@ -16,6 +16,9 @@ from productivity import (review_code, review_uploaded_code, draft_email,
                           log_expense, get_spending_summary)
 import requests
 import os
+client_id = os.getenv("SPOTIFY_CLIENT_ID")
+client_service = os.getenv("SPOTIFY_CLIENT_SECRET")
+redirect_url = os.getenv("SPOTIFY_REDIRECT_URL")
 
 
 def web_search(query):
