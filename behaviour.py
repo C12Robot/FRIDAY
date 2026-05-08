@@ -26,6 +26,17 @@ def _save_log(data):
     with open(BEHAVIOUR_LOG, "w") as f:
         json.dump(data, f, indent=2)
 
+def sanitize(text):
+    patterns = [
+        r'password[^:]*:\s*\S+',
+        r'api[_-]?key[^:]*:\s*\S+',
+        r'\b\d{4}[\s-]?\d{4}[\s-]?\d{4}[\s-]?\d{4}\b',  # credit cards
+        r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b'  # emails
+    ]
+    for pattern in patterns:
+        text = re.sub(pattern, '[REDACTED]', text, flags=re.IGNORECASE)
+    return text
+    
 def log_interaction(user_message, friday_reply, tools_used=[]):
     data = _load_log()
     data.append({

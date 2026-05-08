@@ -5,6 +5,7 @@ import sqlite3
 import shutil
 import ctypes
 from datetime import datetime, timedelta
+import re 
 
 APPS = {
     "spotify": r"C:\Users\meena\AppData\Roaming\Spotify\Spotify.exe",
@@ -35,11 +36,15 @@ HOSTS_FILE = r"C:\Windows\System32\drivers\etc\hosts"
 focus_mode_active = False
 
 def open_app(app_name):
+    # Sanitize input — only allow alphanumeric, spaces, dots, hyphens
+    if not re.match(r'^[\w\s\.\-]+$', app_name):
+        return f"Invalid app name: {app_name}"
+
     try:
         # First check known apps dict
         app = APPS.get(app_name.lower())
         if app:
-            subprocess.Popen([app])
+            subprocess.Popen([app], creationflags=subprocess.DETACHED_PROCESS)
             return f"Opening {app_name}."
 
         # If not in dict, search entire system for it
@@ -49,10 +54,10 @@ def open_app(app_name):
         )
         if search_result.returncode == 0:
             path = search_result.stdout.strip().split('\n')[0]
-            subprocess.Popen([path])
+            subprocess.Popen([path], creationflags=subprocess.DETACHED_PROCESS)
             return f"Opening {app_name}."
 
-        # Last resort — use Windows shell (like pressing Win+R)
+        # Last resort — use Windows shell
         subprocess.Popen(f'start "" "{app_name}"', shell=True)
         return f"Attempting to open {app_name}."
 
@@ -60,8 +65,11 @@ def open_app(app_name):
         return f"Error opening {app_name}: {str(e)}"
 
 def open_url(url):
+    # Sanitize — only allow valid URLs
+    if not re.match(r'^[\w\s\.\-/:?=&%#]+$', url):
+        return f"Invalid URL: {url}"
     try:
-        if not url.startswith("http"):
+        if not url.startswith(("http://", "https://")):
             url = "https://" + url
         webbrowser.open(url)
         return f"Opened {url} in browser."

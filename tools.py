@@ -42,21 +42,22 @@ def web_search(query):
 
 
 def read_file(path):
-    if not os.path.exists(path):
-        return f"File not found at: {path}"
+    abs_path = os.path.abspath(path)
+    if not os.path.exists(abs_path):
+        return f"File not found at: {abs_path}"
     try:
-        with open(path, "r", encoding="utf-8") as f:
+        with open(abs_path, "r", encoding="utf-8") as f:
             return f.read()
     except Exception as e:
         return f"Error reading file: {str(e)}"
 
-
 def write_file(path, content):
-    mode = "a" if ".md" in path else "w"
+    abs_path = os.path.abspath(path)
+    mode = "a" if ".md" in abs_path else "w"
     try:
-        with open(path, mode, encoding="utf-8") as f:
+        with open(abs_path, mode, encoding="utf-8") as f:
             f.write("\n" + content)
-        return f"File written successfully to {path}"
+        return f"File written successfully to {abs_path}"
     except Exception as e:
         return f"Error writing file: {str(e)}"
 
