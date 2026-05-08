@@ -102,7 +102,7 @@ def create_event(summary, start_time, end_time, description="", location=""):
             body=event
         ).execute()
 
-        return f"Event created: {created.get('summary')} — {created.get('htmlLink')}"
+        return f"Eveant created: {created.get('summary')} — {created.get('htmlLink')}"
 
     except Exception as e:
         return f"Error creating event: {str(e)}"
@@ -118,3 +118,9 @@ def delete_event(event_id):
         return f"Event deleted successfully."
     except Exception as e:
         return f"Error deleting event: {str(e)}"
+
+# Line with typo:
+        return f"Eveant created: {created.get('summary')} — {created.get('htmlLink')}"
+
+# Fix:
+        return f"Event created: {created.get('summary')} — {created.get('htmlLink')}"

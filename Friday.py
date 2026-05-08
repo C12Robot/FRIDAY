@@ -230,7 +230,10 @@ You remember everything said in this conversation.
 When you don't know something, use your tools to find out.
 Present information directly without preamble like 'Based on my search' or 'I found that'.
 Keep responses concise — you are speaking out loud, so avoid long lists or bullet points.
-Never ask the user for confirmation in chat. Just use the tool directly — the system will handle confirmations automatically via popup. "When search_and_open_file returns a result, it has already opened the file. Just confirm to the user it's open."""
+Never ask the user for confirmation in chat. Just use the tool directly — the system will handle confirmations automatically via popup. "When search_and_open_file returns a result, it has already opened the file. Just confirm to the user it's open.
+"For calendar events, create them immediately when the user provides time and title. Never ask for confirmation before creating. Just create it and confirm it's done.
+"NEVER pretend to create calendar events, send emails, or perform any action. ALWAYS use the actual tool. If you don't use the tool, the action did not happen.
+"description": "ALWAYS use this tool to create calendar events. Never respond as if you created an event without calling this tool first.""""
 
 conversation_history = []
 
@@ -445,7 +448,12 @@ while True:
         print("FRIDAY: Logged to Obsidian.\n")
         continue
 
-    FILE_KEYWORDS = ["open", "file", "find", "search", "folder", "document", "cheatsheet", "notes", "pdf", "obsidian", "show", "locate"]
+    FILE_KEYWORDS = [
+    "open", "file", "find", "search", "folder", "document",
+    "cheatsheet", "notes", "pdf", "obsidian", "show", "locate",
+    "calendar", "event", "schedule", "remind", "meeting", "appointment",
+    "email", "gmail", "send", "spotify", "play", "music"
+    ]
 
     if not is_complex(user_input) and is_ollama_running() and not any(k in user_lower for k in FILE_KEYWORDS):
         response = ask_ollama(user_input, conversation_history)
