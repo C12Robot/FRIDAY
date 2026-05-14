@@ -279,9 +279,6 @@ def execute_tool(tool_name, tool_input):
         return focus_off()
     elif tool_name == "browser_history":
         return browser_history(tool_input["query"])
-    elif tool_name == "browser_history":
-        result = browser_history(tool_input["query"])
-        return result
     elif tool_name == "search_and_open_file":
         query = tool_input["query"]
         results = search_files(query, limit=3)  
@@ -309,7 +306,7 @@ def chat(user_message):
     while True:
         response = client.messages.create(
             model=os.getenv("ANTHROPIC_MODEL", "claude-sonnet-4-6"),
-            max_tokens=1024,
+            max_tokens=600,
             system=full_system_prompt,
             tools=TOOL_DEFINITIONS,
             messages=conversation_history
